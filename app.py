@@ -65,7 +65,7 @@ with st.sidebar:
     
     st.markdown("""
     <div style="margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0; text-align: center;">
-        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #64748B; background: #F1F5F9; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid #CBD5E1;">
+        <span class="sidebar-fips-badge">
             FIPS 186-4 • P-256
         </span>
         <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.5rem; font-weight: 500;">
@@ -74,7 +74,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- CSS DINAMIS (TERANG / GELAP & RESPONSIF MOBILE) -----------------
+# ----------------- CSS DINAMIS & SISTEM WARNA LENGKAP -----------------
 theme_css = """<style>
     :root {
         --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -84,15 +84,38 @@ theme_css = """<style>
 
 if dark_mode:
     theme_css += """
-    /* Mode Gelap (Dark Theme) */
+    /* =================================================== */
+    /* MODE GELAP (DARK THEME) - KONTROL TOTAL STABILITAS  */
+    /* =================================================== */
     .stApp {
-        background-color: #0F172A !important;
+        background-color: #0A0F1D !important;
         color: #F8FAFC !important;
     }
     
+    /* Typografi Umum & Seluruh Heading */
+    h1, h2, h3, h4, h5, h6 {
+        color: #F8FAFC !important;
+    }
+    
+    p, span, li {
+        color: #E2E8F0 !important;
+    }
+    
+    /* Seluruh Label Formulir Wajib Terang & Terbaca Jelas */
+    label,
+    label p,
+    label span,
+    [data-testid="stWidgetLabel"],
+    [data-testid="stWidgetLabel"] p,
+    [data-testid="stWidgetLabel"] span {
+        color: #F8FAFC !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #1E293B !important;
-        border-right: 1px solid #334155 !important;
+        background-color: #0F172A !important;
+        border-right: 1px solid #1E293B !important;
     }
     
     section[data-testid="stSidebar"] div[role="radiogroup"] label {
@@ -100,7 +123,7 @@ if dark_mode:
     }
     
     section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-        background-color: #334155 !important;
+        background-color: #1E293B !important;
         color: #38BDF8 !important;
     }
     
@@ -116,24 +139,145 @@ if dark_mode:
         color: #FFFFFF !important;
     }
     
+    /* Kartu & Kontainer Utama */
     div[data-testid="stVerticalBlockBorderWrapper"] > div {
-        background-color: #1E293B !important;
-        border-color: #334155 !important;
+        background-color: #111C33 !important;
+        border: 1px solid #1E2E4A !important;
         color: #F8FAFC !important;
     }
     
     .top-bar-container {
-        background-color: #1E293B !important;
-        border: 1px solid #334155 !important;
+        background-color: #111C33 !important;
+        border: 1px solid #1E2E4A !important;
         color: #F8FAFC !important;
     }
     
     .navbar-badge {
-        background-color: #0F172A !important;
-        border: 1px solid #334155 !important;
+        background-color: #0A0F1D !important;
+        border: 1px solid #1E2E4A !important;
         color: #38BDF8 !important;
     }
     
+    /* File Uploader Dropzone */
+    [data-testid="stFileUploader"] {
+        background-color: transparent !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #15223D !important;
+        border: 1.5px dashed #334E68 !important;
+        border-radius: 8px !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #38BDF8 !important;
+        background-color: #1A2B4C !important;
+    }
+    
+    [data-testid="stFileUploaderDropzoneInstructions"],
+    [data-testid="stFileUploaderDropzoneInstructions"] p,
+    [data-testid="stFileUploaderDropzoneInstructions"] span,
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
+        color: #94A3B8 !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"] button,
+    [data-testid="stFileUploader"] button {
+        background-color: #1E2E4A !important;
+        color: #F8FAFC !important;
+        border: 1px solid #334E68 !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"] button:hover,
+    [data-testid="stFileUploader"] button:hover {
+        background-color: #243B61 !important;
+        border-color: #38BDF8 !important;
+        color: #38BDF8 !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"] button * {
+        color: inherit !important;
+    }
+    
+    /* Input Teks & Input Password (Semua Pembungkus React Aria & BaseWeb) */
+    .react-aria-TextField > div,
+    div[data-testid="stTextInput"] > div,
+    div[data-testid="stTextInputRootElement"] > div,
+    div[data-baseweb="input"],
+    div[data-baseweb="base-input"] {
+        background-color: #15223D !important;
+        border: 1px solid #334E68 !important;
+        border-radius: 6px !important;
+        color: #F8FAFC !important;
+    }
+    
+    .react-aria-TextField input,
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stTextInputRootElement"] input,
+    input[type="text"],
+    input[type="password"] {
+        color: #F8FAFC !important;
+        background-color: transparent !important;
+    }
+    
+    .react-aria-TextField input::placeholder,
+    div[data-testid="stTextInput"] input::placeholder,
+    input::placeholder {
+        color: #64748B !important;
+    }
+    
+    /* Dropdown Selectbox */
+    [data-testid="stSelectbox"] div,
+    [data-testid="stSelectbox"] button,
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] div,
+    .react-aria-Select,
+    .react-aria-Select div {
+        background-color: #15223D !important;
+        border: 1px solid #334E68 !important;
+        border-radius: 6px !important;
+        color: #F8FAFC !important;
+    }
+    
+    [data-testid="stSelectbox"] *,
+    div[data-baseweb="select"] * {
+        color: #F8FAFC !important;
+    }
+    
+    .sidebar-fips-badge {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        background-color: #15223D !important;
+        color: #38BDF8 !important;
+        border: 1px solid #334E68 !important;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+    }
+    
+    div[data-testid="stSelectboxVirtualDropdown"],
+    div[role="listbox"],
+    ul[role="listbox"],
+    div[data-baseweb="popover"] > div {
+        background-color: #111C33 !important;
+        border: 1px solid #334E68 !important;
+        color: #F8FAFC !important;
+    }
+    
+    div[role="option"],
+    li[role="option"] {
+        background-color: #111C33 !important;
+        color: #F8FAFC !important;
+    }
+    
+    div[role="option"]:hover,
+    li[role="option"]:hover,
+    div[role="option"][aria-selected="true"],
+    li[role="option"][aria-selected="true"] {
+        background-color: #0284C7 !important;
+        color: #FFFFFF !important;
+    }
+    
+    /* Tombol Primer */
     button[kind="primary"], .stButton > button[kind="primary"] {
         background-color: #0284C7 !important;
         border: 1px solid #0284C7 !important;
@@ -143,43 +287,53 @@ if dark_mode:
     button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
         background-color: #0369A1 !important;
         border-color: #0369A1 !important;
+        color: #FFFFFF !important;
     }
     
+    button[kind="primary"] p {
+        color: #FFFFFF !important;
+    }
+    
+    /* Tombol Sekunder */
     button[kind="secondary"], .stButton > button[kind="secondary"] {
-        background-color: #1E293B !important;
-        border: 1px solid #334155 !important;
+        background-color: #1E2E4A !important;
+        border: 1px solid #334E68 !important;
         color: #F8FAFC !important;
     }
     
     button[kind="secondary"]:hover, .stButton > button[kind="secondary"]:hover {
-        background-color: #334155 !important;
-        border-color: #475569 !important;
+        background-color: #243B61 !important;
+        border-color: #38BDF8 !important;
         color: #38BDF8 !important;
     }
     
+    button[kind="secondary"] p {
+        color: #F8FAFC !important;
+    }
+    
+    /* Metric Cards */
     div[data-testid="stMetric"] {
-        background-color: #1E293B !important;
-        border: 1px solid #334155 !important;
+        background-color: #111C33 !important;
+        border: 1px solid #1E2E4A !important;
         color: #F8FAFC !important;
     }
     
-    input, textarea, select, div[data-baseweb="select"] {
-        background-color: #0F172A !important;
-        color: #F8FAFC !important;
-        border-color: #334155 !important;
+    div[data-testid="stMetricLabel"] p {
+        color: #94A3B8 !important;
     }
     
-    div[data-testid="stFileUploader"] {
-        background-color: #1E293B !important;
-        border-color: #334155 !important;
+    div[data-testid="stMetricValue"] div {
+        color: #38BDF8 !important;
     }
     
-    .hash-hex-display {
-        background-color: #070D1E !important;
+    /* Hash Hex & Code */
+    .hash-hex-display, code {
+        background-color: #060B18 !important;
         border: 1px solid #1E3A8A !important;
         color: #38BDF8 !important;
     }
     
+    /* Sertifikat Valid & Tamper */
     .cert-audit-valid {
         background-color: rgba(5, 150, 105, 0.15) !important;
         border: 1px solid #059669 !important;
@@ -200,22 +354,44 @@ if dark_mode:
         color: #F87171 !important;
     }
     
+    /* Footer */
     .footer-container {
-        background-color: #0F172A !important;
-        border-top: 1px solid #334155 !important;
+        background-color: #0A0F1D !important;
+        border-top: 1px solid #1E2E4A !important;
         color: #94A3B8 !important;
     }
     
     .footer-col h5 {
         color: #F8FAFC !important;
     }
+    
+    .footer-col p {
+        color: #94A3B8 !important;
+    }
     """
 else:
     theme_css += """
-    /* Mode Terang (Light Theme - Siliwangi Navy) */
+    /* =================================================== */
+    /* MODE TERANG (LIGHT THEME - SILIWANGI NAVY)          */
+    /* =================================================== */
     .stApp {
         background-color: #FFFFFF !important;
         color: #0F172A !important;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+        color: #0B3C5D !important;
+    }
+    
+    p, span, li {
+        color: #334155 !important;
+    }
+    
+    label[data-testid="stWidgetLabel"],
+    label[data-testid="stWidgetLabel"] p,
+    label[data-testid="stWidgetLabel"] span {
+        color: #0F172A !important;
+        font-weight: 600 !important;
     }
     
     section[data-testid="stSidebar"] {
@@ -259,6 +435,36 @@ else:
         background-color: #F0F7FC !important;
         border: 1px solid #BAE0F7 !important;
         color: #0B3C5D !important;
+    }
+    
+    /* Dropzone Upload */
+    [data-testid="stFileUploaderDropzone"] {
+        background-color: #F8FAFC !important;
+        border: 1.5px dashed #CBD5E1 !important;
+        border-radius: 8px !important;
+    }
+    
+    [data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #0B3C5D !important;
+        background-color: #F1F5F9 !important;
+    }
+    
+    [data-testid="stFileUploaderDropzoneInstructions"],
+    [data-testid="stFileUploaderDropzoneInstructions"] p {
+        color: #64748B !important;
+    }
+    
+    /* Input Teks */
+    .react-aria-TextField > div,
+    [data-testid="stTextInputRootElement"] > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 6px !important;
+    }
+    
+    .react-aria-TextField input,
+    [data-testid="stTextInputRootElement"] input {
+        color: #0F172A !important;
     }
     
     button[kind="primary"], .stButton > button[kind="primary"] {
@@ -370,10 +576,16 @@ theme_css += """
         letter-spacing: 0.02em;
     }
 
-    /* Layout Scaling */
+    /* Header & Layout Scaling */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 2.75rem !important;
+        z-index: 50 !important;
+    }
+    
     .block-container {
         max-width: 1280px;
-        padding-top: 1.5rem !important;
+        padding-top: 1.75rem !important;
         padding-bottom: 3rem !important;
     }
     
@@ -446,7 +658,6 @@ theme_css += """
     }
 
     @media (max-width: 600px) {
-        /* Buat header Streamlit tetap ada agar tombol buka sidebar (hamburger) bisa ditekan */
         header[data-testid="stHeader"] {
             display: block !important;
             background: transparent !important;
@@ -467,12 +678,10 @@ theme_css += """
             padding-bottom: 2rem !important;
         }
         
-        /* Minimum touch target 44px sesuai WCAG */
         button, input, select {
             min-height: 44px !important;
         }
         
-        /* Hindari horizontal scroll leak */
         .stApp, body, html {
             overflow-x: hidden !important;
         }
