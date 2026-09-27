@@ -337,21 +337,16 @@ with st.sidebar:
         key="nav_sidebar"
     )
     
-    st.divider()
-    st.markdown("###### KONTEKS AKADEMIK")
-    st.caption("**Mata Kuliah:** Keamanan Informasi (20261)")
-    st.caption("**Dosen Pengampu:** Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.")
-    
-    st.markdown("###### TIM PENGEMBANG")
-    st.caption("• Fachri Ridhwan Imani (247006111140)")
-    st.caption("• Wardah Nurwaffiq (247006111150)")
-    st.caption("• Mahardika Rajbi Firdaus (247006111148)")
-    
-    st.divider()
-    st.caption("**Standar Kriptografi:**")
-    st.caption("• NIST FIPS 186-4 (ECDSA P-256)")
-    st.caption("• NIST FIPS 180-4 (SHA-256)")
-    st.caption("• RFC 5280 / PKCS#8")
+    st.markdown("""
+    <div style="margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0; text-align: center;">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #64748B; background: #F1F5F9; padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid #CBD5E1;">
+            FIPS 186-4 • P-256
+        </span>
+        <div style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.5rem; font-weight: 500;">
+            SignaCerta v1.0 • FT UNSIL
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ----------------- TOP BAR BREADCRUMB -----------------
 st.markdown(f"""
@@ -742,7 +737,15 @@ elif nav_choice == "Tentang Proyek":
 
     with col_a2:
         with st.container(border=True):
-            st.markdown("##### 3. Tim Pengembang & Kontribusi")
+            st.markdown("##### 3. Konteks Akademik & Pembimbing")
+            st.markdown("""
+            * **Mata Kuliah:** Keamanan Informasi (20261)
+            * **Program Studi:** Jurusan Informatika, Fakultas Teknik, Universitas Siliwangi
+            * **Dosen Pengampu:** **Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.**
+            * **Tugas Proyek:** Ujian Tengah Semester (UTS) — Topik D (Digital Signature PDF)
+            """)
+            
+            st.markdown("##### 4. Tim Pengembang & Kontribusi")
             st.markdown("""
             * **Fachri Ridhwan Imani** (247006111140)  
               *Peran:* Key Management, Cryptographic Engine (ECDSA P-256), Unit Testing.
@@ -752,14 +755,21 @@ elif nav_choice == "Tentang Proyek":
               *Peran:* Verification Engine, Tamper Auditing, Quantitative Benchmark (30x).
             """)
             
-            st.markdown("##### 4. Referensi Riset Pembina")
+            st.markdown("##### 5. Standar Keamanan & Spesifikasi Kriptografi")
+            st.markdown("""
+            * **NIST FIPS 186-4:** Digital Signature Standard (Kurva Eliptik NIST P-256 / secp256r1).
+            * **NIST FIPS 180-4:** Secure Hash Standard (Fungsi Ringkasan Pesan SHA-256).
+            * **RFC 5280 / PKCS#8:** Enkripsi Kunci Privat Berbasis Kata Sandi (*AES-256-GCM / PBKDF2*).
+            """)
+            
+            st.markdown("##### 6. Referensi Riset Pembina")
             st.caption("Sitasi publikasi ilmiah dosen pengampu (format APA 7 via Mendeley):")
             st.markdown("""
             * Gunawan, R., Rahmatulloh, A., & Rizal, R. (2024). Implementasi Digital Signature Pada Dokumen Elektronik Berbasis QR-Code. *STRING (Satuan Tulisan Riset dan Inovasi Teknologi)*.
             * Raihan, & Rahmatulloh, A. (2026). *Implementation and Performance Analysis of Elliptic Curve Digital Signature Algorithm (ECDSA) for Academic Document Security*. Universitas Siliwangi.
             """)
             
-            st.markdown("##### 5. Pernyataan Integritas Akademik (AI Disclosure)")
+            st.markdown("##### 7. Pernyataan Integritas Akademik (AI Disclosure)")
             st.caption(
                 "Sesuai ketentuan Bagian 10 Pedoman Tugas UTS Keamanan Informasi: "
                 "Asisten AI digunakan secara bertanggung jawab sebagai pendukung perancangan logika dasar dan refaktor antarmuka pengguna. "
