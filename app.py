@@ -445,7 +445,7 @@ elif nav_choice == "2. Penandatanganan Dokumen":
     col_s1, col_s2 = st.columns([1.2, 1], gap="large")
     with col_s1:
         with st.container(border=True):
-            st.markdown("##### 1. Berkas PDF & Identitas Penandatangan")
+            st.markdown("##### 1. Formulir Berkas & Identitas Penandatangan")
             pdf_file = st.file_uploader("Pilih Berkas PDF yang Akan Ditandatangani:", type=["pdf"], key="pdf_sign_upload")
             
             # Tampilkan info berkas instan jika diunggah
@@ -473,7 +473,8 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
                 stamp_pos = st.selectbox("Posisi Lencana Tanda Tangan QR:", ["bottom-right", "bottom-left", "bottom-center"], key="pos_in")
 
-            st.markdown("##### 2. Otorisasi Kunci Privat")
+            st.markdown("---")
+            st.markdown("###### Otorisasi Kunci Privat Penandatangan")
             use_current_key = False
             if "gen_priv_pem" in st.session_state:
                 use_current_key = st.checkbox("Gunakan kunci privat yang baru saja dibangkitkan pada Tab 1", value=True)
@@ -521,7 +522,7 @@ elif nav_choice == "2. Penandatanganan Dokumen":
 
     with col_s2:
         with st.container(border=True):
-            st.markdown("##### 3. Dokumen Hasil Penandatanganan")
+            st.markdown("##### 2. Dokumen Hasil Penandatanganan")
             if "signed_pdf_result" in st.session_state:
                 meta = st.session_state["signed_meta"]
                 latest_sig = meta["signatures"][-1]
