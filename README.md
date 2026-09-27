@@ -7,9 +7,9 @@
 ---
 
 ## 👥 Tim Pengembang
-* **Fachri Ridhwan Imani** (247006111140) — *Key Management, Cryptographic Engine & Signing*
-* **Wardah** — *PDF Integration, QR-Code Stamping & Technical Documentation*
-* **Mahardhika** — *Verification Engine, Benchmarking & Quantitative Testing*
+* **Fachri Ridhwan Imani** (247006111140) — [@1RDHWN1](https://github.com/1RDHWN1) — *Key Management, Cryptographic Engine & Signing*
+* **Wardah Nurwaffiq** (247006111150) — [@wardahnr](https://github.com/wardahnr) — *PDF Integration, QR-Code Stamping & Technical Documentation*
+* **Mahardika Rajbi Firdaus** (247006111148) — [@dikarajbi](https://github.com/dikarajbi) — *Verification Engine, Benchmarking & Quantitative Testing*
 
 ---
 
