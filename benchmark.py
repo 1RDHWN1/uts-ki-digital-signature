@@ -228,6 +228,22 @@ def run_benchmark(iterations: int = 30, excel_output: str = "data_pengujian_benc
     wb.save(excel_output)
     print(f"\n✓ Berhasil mengekspor data pengujian lengkap ke: {excel_output}")
 
+    return {
+        "iterations": iterations,
+        "benchmark_data": benchmark_data,
+        "avg_sign": avg_sign,
+        "min_sign": min_sign,
+        "max_sign": max_sign,
+        "avg_verify": avg_verify,
+        "min_verify": min_verify,
+        "max_verify": max_verify,
+        "pub_size": pub_size,
+        "priv_size": priv_size,
+        "sig_size": sample_sig_size,
+        "tamper_results": tamper_results,
+        "excel_path": excel_output,
+    }
+
 
 if __name__ == "__main__":
     run_benchmark(iterations=30)

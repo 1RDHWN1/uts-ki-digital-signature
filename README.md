@@ -54,7 +54,18 @@ pip install -r requirements.txt
 python -m unittest discover -s tests -v
 ```
 
-### 3. Generate Kunci & Uji Coba Kriptografi
+### 3. Menjalankan Aplikasi Web (Streamlit)
+```bash
+streamlit run app.py
+```
+Aplikasi dapat diakses melalui peramban web di `http://localhost:8501`.
+
+### 4. Menjalankan Pengujian Benchmark (30x Iterasi ke Excel)
+```bash
+python benchmark.py
+```
+
+### 5. Generate Kunci & Uji Coba Kriptografi CLI
 ```bash
 python crypto_engine.py
 ```
