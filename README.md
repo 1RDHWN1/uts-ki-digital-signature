@@ -35,7 +35,9 @@ Proyek ini mengimplementasikan skema **Tanda Tangan Digital (Digital Signature)*
 ├── crypto_engine.py       # Modul inti kriptografi (Keygen, Hash, Sign, Enkripsi Kunci)
 ├── pdf_stamper.py         # Modul integrasi PDF & overlay QR-Code
 ├── verifier.py            # Modul verifikasi dokumen & validasi tanda tangan
-└── benchmark.py           # Script pengujian kuantitatif & ekspor Excel (.xlsx)
+├── benchmark.py           # Script pengujian kuantitatif & ekspor Excel (.xlsx)
+└── tests/                 # Unit test otomatis (minimal 5 skenario uji wajib)
+    └── test_crypto.py     # Pengujian modul kriptografi
 ```
 
 ---
@@ -47,7 +49,12 @@ Proyek ini mengimplementasikan skema **Tanda Tangan Digital (Digital Signature)*
 pip install -r requirements.txt
 ```
 
-### 2. Generate Kunci & Tanda Tangani Dokumen
+### 2. Menjalankan Unit Test (Otomatis)
+```bash
+python -m unittest discover -s tests -v
+```
+
+### 3. Generate Kunci & Uji Coba Kriptografi
 ```bash
 python crypto_engine.py
 ```

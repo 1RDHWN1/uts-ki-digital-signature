@@ -12,7 +12,7 @@ import base64
 import hashlib
 from typing import Tuple, Optional, cast
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.exceptions import InvalidSignature
 
 
@@ -96,6 +96,33 @@ def verify_signature(public_key: ec.EllipticCurvePublicKey, signature_b64: str, 
             raw_signature,
             data_bytes,
             ec.ECDSA(hashes.SHA256())
+        )
+        return True
+    except (InvalidSignature, ValueError):
+        return False
+
+
+def sign_hash(private_key: ec.EllipticCurvePrivateKey, digest_bytes: bytes) -> str:
+    """Menandatangani nilai digest hash SHA-256 (32 bytes) menggunakan Private Key ECDSA.
+    Mengembalikan signature dalam format string Base64.
+    """
+    raw_signature = private_key.sign(
+        digest_bytes,
+        ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+    )
+    return base64.b64encode(raw_signature).decode("utf-8")
+
+
+def verify_hash(public_key: ec.EllipticCurvePublicKey, signature_b64: str, digest_bytes: bytes) -> bool:
+    """Memverifikasi signature Base64 terhadap nilai digest hash SHA-256 menggunakan Public Key.
+    Mengembalikan True jika valid, False jika digest atau signature tidak cocok.
+    """
+    try:
+        raw_signature = base64.b64decode(signature_b64.encode("utf-8"))
+        public_key.verify(
+            raw_signature,
+            digest_bytes,
+            ec.ECDSA(utils.Prehashed(hashes.SHA256()))
         )
         return True
     except (InvalidSignature, ValueError):
