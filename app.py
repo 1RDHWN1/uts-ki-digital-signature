@@ -47,23 +47,30 @@ st.markdown("""
         --border-ui: #E2E8F0;
     }
     
-    /* Layout Scaling */
-    .block-container {
-        max-width: 1240px;
-        padding-top: 1rem;
-        padding-bottom: 2.5rem;
+    /* Sembunyikan Header Bawaan Streamlit yang menutupi bagian atas */
+    header[data-testid="stHeader"] {
+        display: none !important;
     }
     
-    /* Header Navbar */
+    /* Layout Scaling */
+    .block-container {
+        max-width: 1280px;
+        padding-top: 1.5rem !important;
+        padding-bottom: 3rem !important;
+    }
+    
+    /* Header Navbar Brand */
     .navbar-container {
         display: flex;
         justify-content: space-between;
         align-items: center;
         background: #FFFFFF;
-        border-bottom: 2px solid #0B3C5D;
+        border: 1px solid #E2E8F0;
+        border-top: 3px solid #0B3C5D;
         padding: 0.85rem 1.25rem;
-        margin-bottom: 1.5rem;
-        border-radius: 6px 6px 0 0;
+        margin-bottom: 0.75rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
     }
     
     .navbar-brand-group {
@@ -73,14 +80,14 @@ st.markdown("""
     }
     
     .navbar-logo-img {
-        width: 44px;
-        height: 44px;
+        width: 42px;
+        height: 42px;
         object-fit: contain;
     }
     
     .navbar-brand-title {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 1.45rem;
+        font-size: 1.35rem;
         font-weight: 800;
         color: #0B3C5D;
         letter-spacing: -0.02em;
@@ -88,7 +95,7 @@ st.markdown("""
     }
     
     .navbar-brand-desc {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         color: #475569;
         font-weight: 500;
     }
@@ -105,25 +112,51 @@ st.markdown("""
         letter-spacing: 0.02em;
     }
     
-    /* Tabs Navigation Styling */
-    div[data-baseweb="tab-list"] {
-        gap: 0.5rem;
-        border-bottom: 1px solid #E2E8F0;
-        margin-bottom: 1.5rem;
-    }
-    
-    div[data-baseweb="tab"] {
-        padding: 0.65rem 1.15rem;
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: #475569;
-        border-radius: 6px 6px 0 0;
-    }
-    
-    div[data-baseweb="tab"][aria-selected="true"] {
-        color: #0B3C5D !important;
+    /* Transformasi Tab Menjadi Segmented Navbar Modern (React Aria / Streamlit) */
+    [role="tablist"] {
         background-color: #F8FAFC !important;
-        border-bottom: 2.5px solid #0B3C5D !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 0.35rem !important;
+        gap: 0.35rem !important;
+        display: flex !important;
+        width: 100% !important;
+        margin-top: 0.25rem !important;
+        margin-bottom: 2rem !important;
+    }
+    
+    [role="tab"] {
+        flex: 1 !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 0.65rem 0.85rem !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        border-radius: 6px !important;
+        border: none !important;
+        background: transparent !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease-in-out !important;
+    }
+    
+    [role="tab"]:hover {
+        background-color: #EEF2F6 !important;
+        color: #0B3C5D !important;
+    }
+    
+    [role="tab"][aria-selected="true"], [role="tab"][data-selected="true"] {
+        background-color: #0B3C5D !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 1px 3px 0 rgba(11, 60, 93, 0.3) !important;
+    }
+    
+    [role="tab"][aria-selected="true"] *, [role="tab"][data-selected="true"] * {
+        color: #FFFFFF !important;
+    }
+    
+    .react-aria-SelectionIndicator {
+        display: none !important;
     }
     
     /* Tombol Primer Institusional */
@@ -217,7 +250,13 @@ st.markdown("""
 st.markdown("""
 <div class="navbar-container">
     <div class="navbar-brand-group">
-        <img class="navbar-logo-img" src="https://upload.wikimedia.org/wikipedia/id/thumb/7/7b/Logo_Universitas_Siliwangi.png/200px-Logo_Universitas_Siliwangi.png" alt="Logo UNSIL" />
+        <svg class="navbar-logo-img" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="44" height="44" rx="8" fill="#0B3C5D"/>
+            <circle cx="22" cy="22" r="17" stroke="#D97706" stroke-width="1.5"/>
+            <circle cx="22" cy="22" r="14" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="2 2"/>
+            <path d="M22 12L28 18H24V26H20V18H16L22 12Z" fill="#FFFFFF"/>
+            <path d="M16 28H28V30C28 30.5523 27.5523 31 27 31H17C16.4477 31 16 30.5523 16 30V28Z" fill="#D97706"/>
+        </svg>
         <div>
             <div class="navbar-brand-title">SignaCerta</div>
             <div class="navbar-brand-desc">Sistem Otentikasi dan Tanda Tangan Digital PDF • Universitas Siliwangi</div>
