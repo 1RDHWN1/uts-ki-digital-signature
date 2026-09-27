@@ -2,11 +2,6 @@
 Fakultas Teknik, Jurusan Informatika, Universitas Siliwangi
 Tugas Proyek UTS Keamanan Informasi (20261)
 Dosen Pengampu: Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.
-
-Tim Pengembang:
-- Fachri Ridhwan Imani (247006111140) — Key Management & Cryptographic Engine
-- Wardah Nurwaffiq (247006111150) — PDF Integration & QR-Code Stamping
-- Mahardika Rajbi Firdaus (247006111148) — Verification Engine & Benchmark Testing
 """
 
 import io
@@ -32,280 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ----------------- CSS DESAIN INSTITUSIONAL & SKALA RESPONSIF -----------------
-st.markdown("""
-<style>
-    /* Variabel Warna & Tipografi */
-    :root {
-        --primary-navy: #0B3C5D;
-        --navy-dark: #07253D;
-        --navy-light: #1D5F8A;
-        --slate-ink: #0F172A;
-        --slate-muted: #475569;
-        --bg-canvas: #FFFFFF;
-        --bg-alt: #F8FAFC;
-        --border-ui: #E2E8F0;
-    }
-    
-    
-    /* Sidebar Modern Navbar Samping */
-    section[data-testid="stSidebar"] {
-        background-color: #F8FAFC !important;
-        border-right: 1px solid #E2E8F0 !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] {
-        gap: 0.35rem !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] label {
-        background-color: transparent !important;
-        border: 1px solid transparent !important;
-        border-radius: 6px !important;
-        padding: 0.55rem 0.75rem !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        color: #334155 !important;
-        cursor: pointer !important;
-        display: flex !important;
-        align-items: center !important;
-        transition: all 0.15s ease-in-out !important;
-        width: 100% !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-        background-color: #EEF2F6 !important;
-        color: #0B3C5D !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-        display: none !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-        background-color: #0B3C5D !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 1px 3px 0 rgba(11, 60, 93, 0.25) !important;
-    }
-    
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span,
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
-        color: #FFFFFF !important;
-    }
-    
-    /* Top Bar Breadcrumb */
-    .top-bar-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        padding: 0.75rem 1.25rem;
-        margin-bottom: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-    }
-
-    /* Sembunyikan Header Bawaan Streamlit yang menutupi bagian atas */
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-    
-    /* Layout Scaling */
-    .block-container {
-        max-width: 1280px;
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
-    }
-    
-    /* Header Navbar Brand */
-    .navbar-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-top: 3px solid #0B3C5D;
-        padding: 0.85rem 1.25rem;
-        margin-bottom: 0.75rem;
-        border-radius: 8px;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-    }
-    
-    .navbar-brand-group {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-    
-    .navbar-logo-img {
-        width: 42px;
-        height: 42px;
-        object-fit: contain;
-    }
-    
-    .navbar-brand-title {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 1.35rem;
-        font-weight: 800;
-        color: #0B3C5D;
-        letter-spacing: -0.02em;
-        line-height: 1.1;
-    }
-    
-    .navbar-brand-desc {
-        font-size: 0.8rem;
-        color: #475569;
-        font-weight: 500;
-    }
-    
-    .navbar-badge {
-        font-family: "JetBrains Mono", Consolas, monospace;
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #0B3C5D;
-        background-color: #F0F7FC;
-        border: 1px solid #BAE0F7;
-        padding: 0.35rem 0.65rem;
-        border-radius: 4px;
-        letter-spacing: 0.02em;
-    }
-    
-    /* Transformasi Tab Menjadi Segmented Navbar Modern (React Aria / Streamlit) */
-    [role="tablist"] {
-        background-color: #F8FAFC !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 8px !important;
-        padding: 0.35rem !important;
-        gap: 0.35rem !important;
-        display: flex !important;
-        width: 100% !important;
-        margin-top: 0.25rem !important;
-        margin-bottom: 2rem !important;
-    }
-    
-    [role="tab"] {
-        flex: 1 !important;
-        justify-content: center !important;
-        text-align: center !important;
-        padding: 0.65rem 0.85rem !important;
-        font-size: 0.95rem !important;
-        font-weight: 600 !important;
-        color: #475569 !important;
-        border-radius: 6px !important;
-        border: none !important;
-        background: transparent !important;
-        cursor: pointer !important;
-        transition: all 0.15s ease-in-out !important;
-    }
-    
-    [role="tab"]:hover {
-        background-color: #EEF2F6 !important;
-        color: #0B3C5D !important;
-    }
-    
-    [role="tab"][aria-selected="true"], [role="tab"][data-selected="true"] {
-        background-color: #0B3C5D !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 1px 3px 0 rgba(11, 60, 93, 0.3) !important;
-    }
-    
-    [role="tab"][aria-selected="true"] *, [role="tab"][data-selected="true"] * {
-        color: #FFFFFF !important;
-    }
-    
-    .react-aria-SelectionIndicator {
-        display: none !important;
-    }
-    
-    /* Tombol Primer Institusional */
-    button[kind="primary"], .stButton > button[kind="primary"] {
-        background-color: #0B3C5D !important;
-        color: #FFFFFF !important;
-        border: 1px solid #0B3C5D !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        padding: 0.5rem 1rem !important;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
-    }
-    
-    button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
-        background-color: #07253D !important;
-        border-color: #07253D !important;
-        color: #FFFFFF !important;
-    }
-    
-    /* Kartu Sertifikat Audit Resmi (Valid) */
-    .cert-audit-valid {
-        background-color: #F8FCF9;
-        border: 1px solid #10B981;
-        border-left: 6px solid #059669;
-        border-radius: 6px;
-        padding: 1.25rem 1.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .cert-audit-title-valid {
-        color: #065F46;
-        font-size: 1.2rem;
-        font-weight: 800;
-        letter-spacing: -0.01em;
-        margin-bottom: 0.35rem;
-    }
-    
-    /* Kartu Peringatan Pelanggaran Integritas (Tampered) */
-    .cert-audit-tampered {
-        background-color: #FEF8F8;
-        border: 1px solid #F87171;
-        border-left: 6px solid #DC2626;
-        border-radius: 6px;
-        padding: 1.25rem 1.5rem;
-        margin-bottom: 1rem;
-    }
-    
-    .cert-audit-title-tampered {
-        color: #991B1B;
-        font-size: 1.2rem;
-        font-weight: 800;
-        letter-spacing: -0.01em;
-        margin-bottom: 0.35rem;
-    }
-    
-    /* Monospace Code & Hash Boxes */
-    .hash-badge {
-        font-family: "JetBrains Mono", Consolas, monospace;
-        font-size: 0.85rem;
-        background-color: #F1F5F9;
-        color: #0F172A;
-        border: 1px solid #CBD5E1;
-        padding: 0.4rem 0.65rem;
-        border-radius: 4px;
-        word-break: break-all;
-        margin-top: 0.25rem;
-        margin-bottom: 0.75rem;
-    }
-    
-    /* Footer Institusi */
-    .footer-container {
-        border-top: 1px solid #E2E8F0;
-        margin-top: 3.5rem;
-        padding-top: 1.5rem;
-        padding-bottom: 1rem;
-        color: #64748B;
-        font-size: 0.85rem;
-        line-height: 1.6;
-    }
-    
-    .footer-title {
-        color: #0B3C5D;
-        font-weight: 700;
-        font-size: 0.95rem;
-        margin-bottom: 0.5rem;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------- NAVBAR SAMPING (SIDEBAR NAVIGATION) -----------------
+# ----------------- SIDEBAR & NAVIGASI SISTEM -----------------
 with st.sidebar:
     st.markdown("""
     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
@@ -334,8 +56,12 @@ with st.sidebar:
             "Tentang Proyek",
         ],
         label_visibility="collapsed",
-        key="nav_sidebar"
+        key="nav_sidebar",
     )
+    
+    st.markdown("---")
+    st.markdown("###### TEMA TAMPILAN")
+    dark_mode = st.toggle("🌙 Mode Gelap (Dark Mode)", value=False, key="app_theme_dark")
     
     st.markdown("""
     <div style="margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0; text-align: center;">
@@ -348,21 +74,437 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ----------------- TOP BAR BREADCRUMB -----------------
-st.markdown(f"""
+# ----------------- CSS DINAMIS (TERANG / GELAP & RESPONSIF MOBILE) -----------------
+theme_css = """<style>
+    :root {
+        --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "JetBrains Mono", Consolas, monospace;
+    }
+"""
+
+if dark_mode:
+    theme_css += """
+    /* Mode Gelap (Dark Theme) */
+    .stApp {
+        background-color: #0F172A !important;
+        color: #F8FAFC !important;
+    }
+    
+    section[data-testid="stSidebar"] {
+        background-color: #1E293B !important;
+        border-right: 1px solid #334155 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        color: #CBD5E1 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background-color: #334155 !important;
+        color: #38BDF8 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background-color: #0284C7 !important;
+        color: #FFFFFF !important;
+        border-color: #0284C7 !important;
+        box-shadow: 0 1px 3px 0 rgba(2, 132, 199, 0.4) !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span,
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #1E293B !important;
+        border-color: #334155 !important;
+        color: #F8FAFC !important;
+    }
+    
+    .top-bar-container {
+        background-color: #1E293B !important;
+        border: 1px solid #334155 !important;
+        color: #F8FAFC !important;
+    }
+    
+    .navbar-badge {
+        background-color: #0F172A !important;
+        border: 1px solid #334155 !important;
+        color: #38BDF8 !important;
+    }
+    
+    button[kind="primary"], .stButton > button[kind="primary"] {
+        background-color: #0284C7 !important;
+        border: 1px solid #0284C7 !important;
+        color: #FFFFFF !important;
+    }
+    
+    button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
+        background-color: #0369A1 !important;
+        border-color: #0369A1 !important;
+    }
+    
+    button[kind="secondary"], .stButton > button[kind="secondary"] {
+        background-color: #1E293B !important;
+        border: 1px solid #334155 !important;
+        color: #F8FAFC !important;
+    }
+    
+    button[kind="secondary"]:hover, .stButton > button[kind="secondary"]:hover {
+        background-color: #334155 !important;
+        border-color: #475569 !important;
+        color: #38BDF8 !important;
+    }
+    
+    div[data-testid="stMetric"] {
+        background-color: #1E293B !important;
+        border: 1px solid #334155 !important;
+        color: #F8FAFC !important;
+    }
+    
+    input, textarea, select, div[data-baseweb="select"] {
+        background-color: #0F172A !important;
+        color: #F8FAFC !important;
+        border-color: #334155 !important;
+    }
+    
+    div[data-testid="stFileUploader"] {
+        background-color: #1E293B !important;
+        border-color: #334155 !important;
+    }
+    
+    .hash-hex-display {
+        background-color: #070D1E !important;
+        border: 1px solid #1E3A8A !important;
+        color: #38BDF8 !important;
+    }
+    
+    .cert-audit-valid {
+        background-color: rgba(5, 150, 105, 0.15) !important;
+        border: 1px solid #059669 !important;
+        border-left: 6px solid #10B981 !important;
+    }
+    
+    .cert-audit-title-valid {
+        color: #34D399 !important;
+    }
+    
+    .cert-audit-tampered {
+        background-color: rgba(220, 38, 38, 0.18) !important;
+        border: 1px solid #DC2626 !important;
+        border-left: 6px solid #EF4444 !important;
+    }
+    
+    .cert-audit-title-tampered {
+        color: #F87171 !important;
+    }
+    
+    .footer-container {
+        background-color: #0F172A !important;
+        border-top: 1px solid #334155 !important;
+        color: #94A3B8 !important;
+    }
+    
+    .footer-col h5 {
+        color: #F8FAFC !important;
+    }
+    """
+else:
+    theme_css += """
+    /* Mode Terang (Light Theme - Siliwangi Navy) */
+    .stApp {
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+    }
+    
+    section[data-testid="stSidebar"] {
+        background-color: #F8FAFC !important;
+        border-right: 1px solid #E2E8F0 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        color: #334155 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background-color: #EEF2F6 !important;
+        color: #0B3C5D !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background-color: #0B3C5D !important;
+        color: #FFFFFF !important;
+        border-color: #0B3C5D !important;
+        box-shadow: 0 1px 3px 0 rgba(11, 60, 93, 0.25) !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span,
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+    }
+    
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+    }
+    
+    .top-bar-container {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        color: #0F172A !important;
+    }
+    
+    .navbar-badge {
+        background-color: #F0F7FC !important;
+        border: 1px solid #BAE0F7 !important;
+        color: #0B3C5D !important;
+    }
+    
+    button[kind="primary"], .stButton > button[kind="primary"] {
+        background-color: #0B3C5D !important;
+        color: #FFFFFF !important;
+        border: 1px solid #0B3C5D !important;
+    }
+    
+    button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
+        background-color: #07253D !important;
+        border-color: #07253D !important;
+    }
+    
+    button[kind="secondary"], .stButton > button[kind="secondary"] {
+        background-color: #FFFFFF !important;
+        color: #334155 !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+    
+    button[kind="secondary"]:hover, .stButton > button[kind="secondary"]:hover {
+        background-color: #F1F5F9 !important;
+        color: #0B3C5D !important;
+    }
+    
+    div[data-testid="stMetric"] {
+        background-color: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+    }
+    
+    .hash-hex-display {
+        background-color: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+        color: #0B3C5D !important;
+    }
+    
+    .cert-audit-valid {
+        background-color: #F8FCF9 !important;
+        border: 1px solid #10B981 !important;
+        border-left: 6px solid #059669 !important;
+    }
+    
+    .cert-audit-title-valid {
+        color: #065F46 !important;
+    }
+    
+    .cert-audit-tampered {
+        background-color: #FEF2F2 !important;
+        border: 1px solid #F87171 !important;
+        border-left: 6px solid #DC2626 !important;
+    }
+    
+    .cert-audit-title-tampered {
+        color: #991B1B !important;
+    }
+    
+    .footer-container {
+        background-color: #FFFFFF !important;
+        border-top: 1px solid #E2E8F0 !important;
+        color: #64748B !important;
+    }
+    
+    .footer-col h5 {
+        color: #0B3C5D !important;
+    }
+    """
+
+# CSS Universal & Responsif Mobile
+theme_css += """
+    /* Sidebar Radio Base */
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 0.35rem !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 6px !important;
+        padding: 0.55rem 0.75rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: all 0.15s ease-in-out !important;
+        width: 100% !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+
+    /* Top Breadcrumb Bar */
+    .top-bar-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    }
+    
+    .navbar-badge {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.35rem 0.65rem;
+        border-radius: 4px;
+        letter-spacing: 0.02em;
+    }
+
+    /* Layout Scaling */
+    .block-container {
+        max-width: 1280px;
+        padding-top: 1.5rem !important;
+        padding-bottom: 3rem !important;
+    }
+    
+    /* Tombol Primer */
+    button[kind="primary"], .stButton > button[kind="primary"] {
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        padding: 0.5rem 1rem !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* Hash Display */
+    .hash-hex-display {
+        font-family: var(--font-mono);
+        font-size: 0.8rem;
+        padding: 0.65rem 0.85rem;
+        border-radius: 6px;
+        letter-spacing: 0.02em;
+        word-break: break-all;
+        white-space: pre-wrap;
+    }
+    
+    /* Footer */
+    .footer-container {
+        margin-top: 3.5rem;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    
+    .footer-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr;
+        gap: 2rem;
+    }
+    
+    .footer-col h5 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin-bottom: 0.65rem;
+    }
+    
+    .footer-col p {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        margin: 0.25rem 0;
+    }
+
+    /* =================================================== */
+    /* ATURAN RESPONSIF MOBILE & TABLET (antislop-layoutmobile) */
+    /* =================================================== */
+    @media (max-width: 900px) {
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 2rem !important;
+        }
+        .top-bar-container {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.6rem !important;
+            padding: 0.85rem 1rem !important;
+        }
+        .navbar-badge {
+            font-size: 0.7rem !important;
+        }
+        .footer-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 1.5rem !important;
+        }
+    }
+
+    @media (max-width: 600px) {
+        /* Buat header Streamlit tetap ada agar tombol buka sidebar (hamburger) bisa ditekan */
+        header[data-testid="stHeader"] {
+            display: block !important;
+            background: transparent !important;
+            height: 2.75rem !important;
+            z-index: 100 !important;
+        }
+        
+        header[data-testid="stHeader"] button[data-testid="stSidebarCollapseButton"] {
+            min-width: 44px !important;
+            min-height: 44px !important;
+            border-radius: 6px !important;
+        }
+        
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            padding-top: 3.5rem !important;
+            padding-bottom: 2rem !important;
+        }
+        
+        /* Minimum touch target 44px sesuai WCAG */
+        button, input, select {
+            min-height: 44px !important;
+        }
+        
+        /* Hindari horizontal scroll leak */
+        .stApp, body, html {
+            overflow-x: hidden !important;
+        }
+        
+        .hash-hex-display {
+            font-size: 0.72rem !important;
+            word-break: break-all !important;
+            white-space: pre-wrap !important;
+            padding: 0.5rem !important;
+        }
+        
+        .footer-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.25rem !important;
+        }
+    }
+</style>"""
+
+theme_badge_color = "#38BDF8" if dark_mode else "#0B3C5D"
+theme_css += f"""
 <div class="top-bar-container">
-    <div style="font-size: 0.95rem; font-weight: 600; color: #475569;">
-        <span style="color: #0B3C5D; font-weight: 700;">SignaCerta</span> &nbsp;/&nbsp; <span style="color: #0B3C5D;">{nav_choice}</span>
+    <div style="font-size: 0.92rem; font-weight: 600;">
+        <span style="color: {theme_badge_color}; font-weight: 700;">SignaCerta</span> &nbsp;/&nbsp; {nav_choice}
     </div>
     <div class="navbar-badge">
-        NIST P-256 (secp256r1) • SHA-256 • FIPS 186-4
+        NIST P-256 • SHA-256 • FIPS 186-4
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""
 
-# ==============================================================================
-# TAB 1: PEMBANGKITAN KUNCI (KEY MANAGEMENT)
-# ==============================================================================
+st.markdown(theme_css, unsafe_allow_html=True)
+
 if nav_choice == "1. Pembangkitan Kunci":
     st.subheader("Pembangkitan Pasangan Kunci Asimetris ECDSA NIST P-256")
     st.write(
