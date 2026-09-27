@@ -60,8 +60,15 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.markdown("###### TEMA TAMPILAN")
-    dark_mode = st.toggle("🌙 Mode Gelap (Dark Mode)", value=False, key="app_theme_dark")
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <span style="font-size: 0.82rem; font-weight: 600;">Tema Antarmuka</span>
+    </div>
+    """, unsafe_allow_html=True)
+    dark_mode = st.toggle("Mode Gelap", value=False, key="app_theme_dark")
     
     st.markdown("""
     <div style="margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid #E2E8F0; text-align: center;">
@@ -467,26 +474,80 @@ else:
         color: #0F172A !important;
     }
     
-    button[kind="primary"], .stButton > button[kind="primary"] {
+    .react-aria-TextField input::placeholder,
+    [data-testid="stTextInputRootElement"] input::placeholder,
+    input::placeholder {
+        color: #64748B !important;
+        opacity: 1 !important;
+    }
+    
+    /* Tombol Utama (Primary) Light Mode - Wajib Teks Putih Kontras Tinggi */
+    button[kind="primary"],
+    .stButton > button[kind="primary"],
+    button[data-testid="baseButton-primary"] {
         background-color: #0B3C5D !important;
         color: #FFFFFF !important;
         border: 1px solid #0B3C5D !important;
     }
     
-    button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
-        background-color: #07253D !important;
-        border-color: #07253D !important;
+    button[kind="primary"] *,
+    .stButton > button[kind="primary"] *,
+    button[data-testid="baseButton-primary"] * {
+        color: #FFFFFF !important;
     }
     
-    button[kind="secondary"], .stButton > button[kind="secondary"] {
+    button[kind="primary"]:hover,
+    .stButton > button[kind="primary"]:hover,
+    button[data-testid="baseButton-primary"]:hover {
+        background-color: #07253D !important;
+        border-color: #07253D !important;
+        color: #FFFFFF !important;
+    }
+    
+    button[kind="primary"]:hover *,
+    .stButton > button[kind="primary"]:hover *,
+    button[data-testid="baseButton-primary"]:hover * {
+        color: #FFFFFF !important;
+    }
+    
+    /* Tombol Sekunder Light Mode */
+    button[kind="secondary"],
+    .stButton > button[kind="secondary"],
+    button[data-testid="baseButton-secondary"] {
         background-color: #FFFFFF !important;
-        color: #334155 !important;
+        color: #0F172A !important;
         border: 1px solid #CBD5E1 !important;
     }
     
-    button[kind="secondary"]:hover, .stButton > button[kind="secondary"]:hover {
+    button[kind="secondary"] *,
+    .stButton > button[kind="secondary"] *,
+    button[data-testid="baseButton-secondary"] * {
+        color: #0F172A !important;
+    }
+    
+    button[kind="secondary"]:hover,
+    .stButton > button[kind="secondary"]:hover,
+    button[data-testid="baseButton-secondary"]:hover {
         background-color: #F1F5F9 !important;
+        border-color: #0B3C5D !important;
         color: #0B3C5D !important;
+    }
+    
+    button[kind="secondary"]:hover *,
+    .stButton > button[kind="secondary"]:hover *,
+    button[data-testid="baseButton-secondary"]:hover * {
+        color: #0B3C5D !important;
+    }
+    
+    /* Password Eye Icon styling */
+    div[data-testid="stTextInputRootElement"] button {
+        background: transparent !important;
+        border: none !important;
+        filter: grayscale(100%) opacity(60%) !important;
+    }
+    
+    div[data-testid="stTextInputRootElement"] button:hover {
+        filter: grayscale(100%) opacity(100%) !important;
     }
     
     div[data-testid="stMetric"] {
