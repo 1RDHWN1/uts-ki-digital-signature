@@ -1,4 +1,4 @@
-# Aplikasi Digital Signature pada Dokumen PDF Berbasis QR-Code
+# SignaCerta — Aplikasi Digital Signature pada Dokumen PDF Berbasis QR-Code
 
 > Tugas Proyek UTS Mata Kuliah Keamanan Informasi (20261)  
 > Jurusan Informatika, Fakultas Teknik, Universitas Siliwangi  

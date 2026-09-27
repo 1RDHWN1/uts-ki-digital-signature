@@ -176,7 +176,7 @@ def sign_and_stamp_pdf(
 
     # 3. Payload ringkas untuk QR-Code
     qr_payload = json.dumps({
-        "app": "SIDIGS-UNSIL",
+        "app": "SignaCerta-UNSIL",
         "signer": signer_name,
         "id": signer_id,
         "inst": institution,

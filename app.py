@@ -1,463 +1,532 @@
-"""Aplikasi Web Digital Signature Dokumen PDF Berbasis QR-Code
-Sistem Informasi Digital Signature (SIDIGS) - Universitas Siliwangi
+"""SignaCerta — Sistem Otentikasi dan Tanda Tangan Digital Dokumen PDF
+Fakultas Teknik, Jurusan Informatika, Universitas Siliwangi
 Tugas Proyek UTS Keamanan Informasi (20261)
 Dosen Pengampu: Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.
 
 Tim Pengembang:
-- Fachri Ridhwan Imani (247006111140)
-- Wardah Nurwaffiq (247006111150)
-- Mahardika Rajbi Firdaus (247006111148)
+- Fachri Ridhwan Imani (247006111140) — Key Management & Cryptographic Engine
+- Wardah Nurwaffiq (247006111150) — PDF Integration & QR-Code Stamping
+- Mahardika Rajbi Firdaus (247006111148) — Verification Engine & Benchmark Testing
 """
 
 import io
 import os
 import streamlit as st
 import pandas as pd
+from pypdf import PdfReader
 
 from crypto_engine import (
     generate_keypair,
     export_private_key_pem,
     export_public_key_pem,
     load_private_key_pem,
+    hash_bytes,
 )
 from pdf_stamper import sign_and_stamp_pdf
 from verifier import verify_pdf_document
 
 # ----------------- KONFIGURASI HALAMAN -----------------
 st.set_page_config(
-    page_title="SIDIGS - Digital Signature PDF (Universitas Siliwangi)",
+    page_title="SignaCerta — Otentikasi PDF (Universitas Siliwangi)",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ----------------- CSS DESAIN INSTITUSIONAL (ANTI-SLOP) -----------------
+# ----------------- CSS DESAIN INSTITUSIONAL & SKALA RESPONSIF -----------------
 st.markdown("""
 <style>
-    /* Tipografi & Warna Dasar Institusi */
+    /* Variabel Warna & Tipografi */
     :root {
         --primary-navy: #0B3C5D;
-        --navy-dark: #07233B;
-        --slate-text: #0F172A;
-        --muted-text: #475569;
-        --bg-surface: #FFFFFF;
+        --navy-dark: #07253D;
+        --navy-light: #1D5F8A;
+        --slate-ink: #0F172A;
+        --slate-muted: #475569;
+        --bg-canvas: #FFFFFF;
         --bg-alt: #F8FAFC;
-        --border-color: #E2E8F0;
+        --border-ui: #E2E8F0;
     }
     
-    .reportview-container .main .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+    /* Layout Scaling */
+    .block-container {
+        max-width: 1240px;
+        padding-top: 1rem;
+        padding-bottom: 2.5rem;
     }
     
-    /* Judul Utama */
-    .brand-header {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 1.85rem;
-        font-weight: 700;
-        color: #0B3C5D;
-        letter-spacing: -0.02em;
-        margin-bottom: 0.25rem;
-    }
-    
-    .brand-subheader {
-        font-size: 0.95rem;
-        color: #475569;
+    /* Header Navbar */
+    .navbar-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #FFFFFF;
+        border-bottom: 2px solid #0B3C5D;
+        padding: 0.85rem 1.25rem;
         margin-bottom: 1.5rem;
-        line-height: 1.5;
-        border-bottom: 1px solid #E2E8F0;
-        padding-bottom: 1rem;
+        border-radius: 6px 6px 0 0;
     }
     
-    /* Kartu Sertifikat Verifikasi Resmi (Valid) */
-    .cert-box-valid {
-        background-color: #F8FCF9;
-        border: 1px solid #10B981;
-        border-left: 5px solid #059669;
-        border-radius: 6px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-    }
-    
-    .cert-title-valid {
-        color: #065F46;
-        font-size: 1.15rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
+    .navbar-brand-group {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 1rem;
     }
     
-    /* Kartu Peringatan Manipulasi (Tampered) */
-    .cert-box-tampered {
-        background-color: #FEF8F8;
-        border: 1px solid #F87171;
-        border-left: 5px solid #DC2626;
-        border-radius: 6px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
+    .navbar-logo-img {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
     }
     
-    .cert-title-tampered {
-        color: #991B1B;
-        font-size: 1.15rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
+    .navbar-brand-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: #0B3C5D;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
     }
     
-    /* Monospace Hash Display */
-    .hash-display {
-        font-family: "JetBrains Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-        background-color: #F1F5F9;
-        border: 1px solid #CBD5E1;
+    .navbar-brand-desc {
+        font-size: 0.82rem;
+        color: #475569;
+        font-weight: 500;
+    }
+    
+    .navbar-badge {
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #0B3C5D;
+        background-color: #F0F7FC;
+        border: 1px solid #BAE0F7;
+        padding: 0.35rem 0.65rem;
         border-radius: 4px;
-        padding: 0.4rem 0.6rem;
-        font-size: 0.85rem;
-        color: #1E293B;
-        word-break: break-all;
+        letter-spacing: 0.02em;
     }
     
-    /* Metric Card Styling */
-    div[data-testid="stMetric"] {
-        background-color: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
+    /* Tabs Navigation Styling */
+    div[data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        border-bottom: 1px solid #E2E8F0;
+        margin-bottom: 1.5rem;
     }
     
-    /* Tombol Aksi Utama Institusional */
+    div[data-baseweb="tab"] {
+        padding: 0.65rem 1.15rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #475569;
+        border-radius: 6px 6px 0 0;
+    }
+    
+    div[data-baseweb="tab"][aria-selected="true"] {
+        color: #0B3C5D !important;
+        background-color: #F8FAFC !important;
+        border-bottom: 2.5px solid #0B3C5D !important;
+    }
+    
+    /* Tombol Primer Institusional */
     button[kind="primary"], .stButton > button[kind="primary"] {
         background-color: #0B3C5D !important;
         color: #FFFFFF !important;
         border: 1px solid #0B3C5D !important;
         border-radius: 6px !important;
         font-weight: 600 !important;
+        padding: 0.5rem 1rem !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
+    
     button[kind="primary"]:hover, .stButton > button[kind="primary"]:hover {
-        background-color: #072B44 !important;
-        border-color: #072B44 !important;
+        background-color: #07253D !important;
+        border-color: #07253D !important;
         color: #FFFFFF !important;
+    }
+    
+    /* Kartu Sertifikat Audit Resmi (Valid) */
+    .cert-audit-valid {
+        background-color: #F8FCF9;
+        border: 1px solid #10B981;
+        border-left: 6px solid #059669;
+        border-radius: 6px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .cert-audit-title-valid {
+        color: #065F46;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin-bottom: 0.35rem;
+    }
+    
+    /* Kartu Peringatan Pelanggaran Integritas (Tampered) */
+    .cert-audit-tampered {
+        background-color: #FEF8F8;
+        border: 1px solid #F87171;
+        border-left: 6px solid #DC2626;
+        border-radius: 6px;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .cert-audit-title-tampered {
+        color: #991B1B;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin-bottom: 0.35rem;
+    }
+    
+    /* Monospace Code & Hash Boxes */
+    .hash-badge {
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 0.85rem;
+        background-color: #F1F5F9;
+        color: #0F172A;
+        border: 1px solid #CBD5E1;
+        padding: 0.4rem 0.65rem;
+        border-radius: 4px;
+        word-break: break-all;
+        margin-top: 0.25rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    /* Footer Institusi */
+    .footer-container {
+        border-top: 1px solid #E2E8F0;
+        margin-top: 3.5rem;
+        padding-top: 1.5rem;
+        padding-bottom: 1rem;
+        color: #64748B;
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+    
+    .footer-title {
+        color: #0B3C5D;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- SIDEBAR IDENTITAS INSTITUSI -----------------
-with st.sidebar:
-    st.image(
-        "https://upload.wikimedia.org/wikipedia/id/thumb/7/7b/Logo_Universitas_Siliwangi.png/200px-Logo_Universitas_Siliwangi.png",
-        width=80
-    )
-    st.markdown("### **SIDIGS UNSIL**")
-    st.markdown("**Sistem Verifikasi Dokumen Digital**")
-    st.caption("Fakultas Teknik • Universitas Siliwangi")
-    
-    st.markdown("---")
-    st.markdown("##### Dosen Pengampu")
-    st.write("**Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.**")
-    st.caption("Mata Kuliah: Keamanan Informasi (20261)")
-    
-    st.markdown("##### Tim Pengembang")
-    st.markdown("""
-    - **Fachri Ridhwan Imani** (247006111140)  
-      *Key Management & Cryptographic Engine*
-    - **Wardah Nurwaffiq** (247006111150)  
-      *PDF Integration & QR-Code Stamping*
-    - **Mahardika Rajbi Firdaus** (247006111148)  
-      *Verification Engine & Benchmark Testing*
-    """)
-    
-    st.markdown("---")
-    st.caption("**Spesifikasi Keamanan:**")
-    st.caption("• Algoritma: ECDSA NIST P-256 (secp256r1)")
-    st.caption("• Fungsi Hash: SHA-256 (FIPS 180-4)")
-    st.caption("• Proteksi Kunci: AES-256 PKCS#8 Passphrase")
+# ----------------- TOP NAVBAR INSTITUSIONAL -----------------
+st.markdown("""
+<div class="navbar-container">
+    <div class="navbar-brand-group">
+        <img class="navbar-logo-img" src="https://upload.wikimedia.org/wikipedia/id/thumb/7/7b/Logo_Universitas_Siliwangi.png/200px-Logo_Universitas_Siliwangi.png" alt="Logo UNSIL" />
+        <div>
+            <div class="navbar-brand-title">SignaCerta</div>
+            <div class="navbar-brand-desc">Sistem Otentikasi dan Tanda Tangan Digital PDF • Universitas Siliwangi</div>
+        </div>
+    </div>
+    <div class="navbar-badge">
+        NIST P-256 (secp256r1) • SHA-256 • FIPS 186-4
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# ----------------- HEADER UTAMA -----------------
-st.markdown('<div class="brand-header">Sistem Informasi Digital Signature Dokumen PDF</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="brand-subheader">'
-    'Layanan autentikasi dan penjaminan integritas berkas elektronik menggunakan skema tanda tangan digital '
-    'kurva eliptik ECDSA NIST P-256 serta penandaan visual QR-Code.'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-tab1, tab2, tab3, tab4 = st.tabs([
+# ----------------- SIDE-BY-SIDE HORIZONTAL NAVIGATION -----------------
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "1. Pembangkitan Kunci",
     "2. Penandatanganan Dokumen",
-    "3. Verifikasi Integritas Dokumen",
-    "4. Pengujian Kuantitatif & Benchmark",
+    "3. Verifikasi Integritas",
+    "4. Uji Kuantitatif & Benchmark",
+    "Tentang Proyek",
 ])
 
-# ----------------- TAB 1: MANAJEMEN KUNCI -----------------
+# ==============================================================================
+# TAB 1: PEMBANGKITAN KUNCI (KEY MANAGEMENT)
+# ==============================================================================
 with tab1:
-    st.markdown("#### Pembangkitan Pasangan Kunci Asimetris (ECDSA P-256)")
+    st.subheader("Pembangkitan Pasangan Kunci Asimetris ECDSA NIST P-256")
     st.write(
-        "Kunci privat (*Private Key*) digunakan secara rahasia untuk menandatangani dokumen, "
-        "sedangkan kunci publik (*Public Key*) disebarkan kepada penerima untuk memverifikasi keaslian dokumen."
+        "Kunci privat (*Private Key*) disimpan secara rahasia untuk menandatangani berkas, "
+        "sedangkan kunci publik (*Public Key*) disebarkan untuk memvalidasi keaslian dokumen."
     )
     
-    col_k1, col_k2 = st.columns([1.1, 1])
+    col_k1, col_k2 = st.columns([1.1, 1], gap="large")
     with col_k1:
-        st.markdown("##### 1. Masukkan Passphrase Pengaman")
-        passphrase_input = st.text_input(
-            "Kata Sandi / Passphrase untuk Melindungi Kunci Privat:",
-            type="password",
-            placeholder="Masukkan kata sandi pengaman kunci privat...",
-            help="Sesuai standar FIPS/NIST, berkas Private Key wajib disimpan dalam keadaan terenkripsi (AES-256).",
-            key="pass_keygen"
-        )
-        
-        btn_generate = st.button("Bangkitkan Pasangan Kunci Baru", type="primary", use_container_width=True)
-        if btn_generate:
-            if not passphrase_input or len(passphrase_input) < 6:
-                st.error("Passphrase wajib diisi minimal 6 karakter untuk menjamin kekuatan enkripsi.")
-            else:
-                with st.spinner("Menghasilkan titik generator pada kurva NIST P-256..."):
-                    priv, pub = generate_keypair()
-                    priv_pem = export_private_key_pem(priv, passphrase=passphrase_input)
-                    pub_pem = export_public_key_pem(pub)
-                    
-                    st.session_state["gen_priv_pem"] = priv_pem
-                    st.session_state["gen_pub_pem"] = pub_pem
-                    st.success("Pasangan kunci ECDSA NIST P-256 berhasil dibangkitkan dan diamankan.")
+        with st.container(border=True):
+            st.markdown("##### Langkah 1: Tentukan Passphrase Pengaman")
+            st.caption("Sesuai standar FIPS 186-4, Private Key wajib dienkripsi berbasis AES-256 (PKCS#8).")
+            
+            passphrase_input = st.text_input(
+                "Kata Sandi / Passphrase Kunci Privat:",
+                type="password",
+                placeholder="Masukkan kata sandi pengaman (minimal 6 karakter)...",
+                key="pass_keygen"
+            )
+            
+            btn_generate = st.button("Bangkitkan Pasangan Kunci Baru", type="primary", use_container_width=True)
+            if btn_generate:
+                if not passphrase_input or len(passphrase_input) < 6:
+                    st.error("Passphrase wajib diisi minimal 6 karakter demi kekuatan enkripsi.")
+                else:
+                    with st.spinner("Menghasilkan titik generator acak pada kurva secp256r1..."):
+                        priv, pub = generate_keypair()
+                        priv_pem = export_private_key_pem(priv, passphrase=passphrase_input)
+                        pub_pem = export_public_key_pem(pub)
+                        
+                        st.session_state["gen_priv_pem"] = priv_pem
+                        st.session_state["gen_pub_pem"] = pub_pem
+                        st.session_state["saved_passphrase"] = passphrase_input
+                        st.success("Pasangan kunci ECDSA NIST P-256 berhasil dibangkitkan dan diamankan.")
 
     with col_k2:
-        st.markdown("##### 2. Unduh Berkas Kunci Kriptografi")
-        if "gen_priv_pem" in st.session_state:
-            st.download_button(
-                label="Unduh Kunci Privat (private_key.pem) — RAHASIA",
-                data=st.session_state["gen_priv_pem"],
-                file_name="private_key.pem",
-                mime="application/x-pem-file",
-                use_container_width=True,
-            )
-            st.download_button(
-                label="Unduh Kunci Publik (public_key.pem) — PUBLIK",
-                data=st.session_state["gen_pub_pem"],
-                file_name="public_key.pem",
-                mime="application/x-pem-file",
-                use_container_width=True,
-            )
-            st.info(
-                "Catatan Keamanan: Kunci privat terenkripsi dengan algoritma AES-256-GCM. "
-                "Simpan berkas ini di penyimpanan aman dan jangan pernah dibagikan kepada pihak lain."
-            )
-        else:
-            st.caption("Berkas kunci (.pem) akan muncul di sini setelah proses pembangkitan selesai.")
+        with st.container(border=True):
+            st.markdown("##### Langkah 2: Unduh Berkas Kunci Kriptografi")
+            if "gen_priv_pem" in st.session_state:
+                pub_bytes = st.session_state["gen_pub_pem"]
+                priv_bytes = st.session_state["gen_priv_pem"]
+                pub_fingerprint = hash_bytes(pub_bytes)
+                
+                st.write(f"• **Ukuran Public Key:** `{len(pub_bytes)} bytes` (Format PEM)")
+                st.write(f"• **Ukuran Private Key (Terenkripsi):** `{len(priv_bytes)} bytes`")
+                st.caption("Fingerprint Kunci Publik (SHA-256):")
+                st.markdown(f'<div class="hash-badge">{pub_fingerprint}</div>', unsafe_allow_html=True)
+                
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    st.download_button(
+                        label="Unduh Kunci Privat (.pem)",
+                        data=priv_bytes,
+                        file_name="private_key.pem",
+                        mime="application/x-pem-file",
+                        use_container_width=True,
+                    )
+                with col_d2:
+                    st.download_button(
+                        label="Unduh Kunci Publik (.pem)",
+                        data=pub_bytes,
+                        file_name="public_key.pem",
+                        mime="application/x-pem-file",
+                        use_container_width=True,
+                    )
+                st.info("Kunci privat Anda siap digunakan. Beralihlah ke tab '2. Penandatanganan Dokumen' untuk menandatangani berkas.")
+            else:
+                st.caption("Berkas kunci (.pem) dan sidik jari kriptografis akan tampil di sini setelah dibuat.")
 
-# ----------------- TAB 2: PENANDATANGANAN DOKUMEN -----------------
+# ==============================================================================
+# TAB 2: PENANDATANGANAN DOKUMEN (SIGNING)
+# ==============================================================================
 with tab2:
-    st.markdown("#### Penandatanganan Dokumen PDF")
+    st.subheader("Penandatanganan Dokumen PDF & Pembubuhan Lencana QR-Code")
     st.write(
-        "Unggah dokumen PDF asli, lengkapi identitas penandatangan, lalu pilih letak penempelan lencana QR-Code. "
-        "Sistem mendukung penandatanganan bertingkat (*multiple signers*) tanpa merusak tanda tangan sebelumnya."
+        "Unggah dokumen PDF asli, tentukan identitas resmi penandatangan, lalu pilih letak penempelan lencana QR-Code. "
+        "Sistem mendukung fitur penandatanganan berjenjang (*Multiple Signers*) tanpa merusak tanda tangan terdahulu."
     )
     
-    col_s1, col_s2 = st.columns([1.2, 1])
+    col_s1, col_s2 = st.columns([1.2, 1], gap="large")
     with col_s1:
-        st.markdown("##### 1. Berkas & Identitas Dokumen")
-        pdf_file = st.file_uploader("Pilih Berkas PDF Asli:", type=["pdf"], key="pdf_upload_sign")
-        
-        c_i1, c_i2 = st.columns(2)
-        with c_i1:
-            signer_name = st.text_input(
-                "Nama Lengkap Penandatangan:",
-                placeholder="Contoh: Fachri Ridhwan Imani",
-                key="name_input"
-            )
-            signer_id = st.text_input(
-                "NPM / NIP / NIDN:",
-                placeholder="Contoh: 247006111140",
-                key="id_input"
-            )
-        with c_i2:
-            institution = st.text_input(
-                "Institusi / Jabatan:",
-                placeholder="Contoh: Universitas Siliwangi",
-                key="inst_input"
-            )
-            stamp_pos = st.selectbox(
-                "Posisi Lencana QR-Code:",
-                ["bottom-right", "bottom-left", "bottom-center"],
-                key="pos_input"
-            )
-
-        st.markdown("##### 2. Kredensial Otorisasi Penandatangan")
-        priv_key_file = st.file_uploader("Unggah Berkas Kunci Privat (.pem):", type=["pem", "key"], key="priv_upload_sign")
-        signer_passphrase = st.text_input(
-            "Passphrase Pembuka Kunci Privat:",
-            type="password",
-            placeholder="Masukkan passphrase yang sesuai...",
-            key="pass_sign_input"
-        )
-
-        btn_sign = st.button("Tandatangani Dokumen Sekarang", type="primary", use_container_width=True)
-        if btn_sign:
-            if not pdf_file:
-                st.error("Silakan pilih berkas PDF asli terlebih dahulu.")
-            elif not signer_name or not signer_id:
-                st.error("Nama lengkap dan NPM/NIP penandatangan wajib diisi.")
-            elif not priv_key_file or not signer_passphrase:
-                st.error("Berkas Private Key (.pem) dan Passphrase wajib disertakan untuk otorisasi.")
-            else:
+        with st.container(border=True):
+            st.markdown("##### 1. Berkas PDF & Identitas Penandatangan")
+            pdf_file = st.file_uploader("Pilih Berkas PDF yang Akan Ditandatangani:", type=["pdf"], key="pdf_sign_upload")
+            
+            # Tampilkan info berkas instan jika diunggah
+            if pdf_file:
                 try:
-                    with st.spinner("Menghitung hash SHA-256 dan membubuhkan tanda tangan digital..."):
-                        priv_bytes = priv_key_file.getvalue()
-                        private_key = load_private_key_pem(priv_bytes, passphrase=signer_passphrase)
-                        public_key_pem = export_public_key_pem(private_key.public_key())
-                        
-                        pdf_input_bytes = pdf_file.getvalue()
-                        signed_pdf_bytes, meta = sign_and_stamp_pdf(
-                            input_pdf_bytes=pdf_input_bytes,
-                            private_key=private_key,
-                            public_key_pem=public_key_pem,
-                            signer_name=signer_name,
-                            signer_id=signer_id,
-                            institution=institution or "Universitas Siliwangi",
-                            position=stamp_pos,
-                        )
-                        st.session_state["signed_pdf_result"] = signed_pdf_bytes
-                        st.session_state["signed_meta"] = meta
-                        st.success("Dokumen PDF berhasil ditandatangani dan dicap dengan lencana verifikasi QR-Code.")
-                except ValueError:
-                    st.error("Passphrase tidak valid! Kunci privat gagal didekripsi.")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan teknis: {e}")
+                    pdf_bytes_tmp = pdf_file.getvalue()
+                    reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
+                    st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
+                except Exception:
+                    pass
+
+            c_q1, c_q2 = st.columns([3, 1])
+            with c_q2:
+                btn_preset = st.button("Isi Cepat Demo", help="Mengisi kolom dengan profil anggota kelompok secara otomatis untuk demonstrasi cepat.", use_container_width=True)
+            
+            val_name = "Fachri Ridhwan Imani" if btn_preset else ""
+            val_id = "247006111140" if btn_preset else ""
+            val_inst = "Universitas Siliwangi" if btn_preset else ""
+
+            ci_1, ci_2 = st.columns(2)
+            with ci_1:
+                signer_name = st.text_input("Nama Lengkap Penandatangan:", value=val_name, placeholder="Contoh: Fachri Ridhwan Imani", key="name_in")
+                signer_id = st.text_input("NPM / NIP / NIDN:", value=val_id, placeholder="Contoh: 247006111140", key="id_in")
+            with ci_2:
+                institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
+                stamp_pos = st.selectbox("Posisi Lencana Tanda Tangan QR:", ["bottom-right", "bottom-left", "bottom-center"], key="pos_in")
+
+            st.markdown("##### 2. Otorisasi Kunci Privat")
+            use_current_key = False
+            if "gen_priv_pem" in st.session_state:
+                use_current_key = st.checkbox("Gunakan kunci privat yang baru saja dibangkitkan pada Tab 1", value=True)
+
+            if use_current_key:
+                priv_bytes_input = st.session_state["gen_priv_pem"]
+                default_pass = st.session_state.get("saved_passphrase", "")
+                signer_pass = st.text_input("Passphrase Kunci Privat:", value=default_pass, type="password", key="pass_preset")
+            else:
+                priv_file_in = st.file_uploader("Unggah Berkas Kunci Privat (.pem):", type=["pem", "key"], key="priv_file_upload")
+                priv_bytes_input = priv_file_in.getvalue() if priv_file_in else None
+                signer_pass = st.text_input("Passphrase Kunci Privat:", type="password", placeholder="Masukkan passphrase pengaman...", key="pass_custom")
+
+            btn_execute_sign = st.button("Tandatangani Dokumen Sekarang", type="primary", use_container_width=True)
+            if btn_execute_sign:
+                if not pdf_file:
+                    st.error("Silakan unggah dokumen PDF asli terlebih dahulu.")
+                elif not signer_name or not signer_id:
+                    st.error("Nama lengkap dan identitas pengenal (NPM/NIP) wajib diisi.")
+                elif not priv_bytes_input or not signer_pass:
+                    st.error("Berkas Private Key dan Passphrase wajib disertakan untuk otorisasi tanda tangan.")
+                else:
+                    try:
+                        with st.spinner("Menghitung digest SHA-256 dan membubuhkan stempel kriptografis..."):
+                            private_key = load_private_key_pem(priv_bytes_input, passphrase=signer_pass)
+                            public_key_pem = export_public_key_pem(private_key.public_key())
+                            
+                            pdf_bytes = pdf_file.getvalue()
+                            signed_bytes, meta = sign_and_stamp_pdf(
+                                input_pdf_bytes=pdf_bytes,
+                                private_key=private_key,
+                                public_key_pem=public_key_pem,
+                                signer_name=signer_name,
+                                signer_id=signer_id,
+                                institution=institution or "Universitas Siliwangi",
+                                position=stamp_pos,
+                            )
+                            st.session_state["signed_pdf_result"] = signed_bytes
+                            st.session_state["signed_meta"] = meta
+                            st.success("Dokumen PDF berhasil ditandatangani dan dicap dengan lencana QR-Code.")
+                    except ValueError:
+                        st.error("Passphrase tidak sesuai! Kunci privat gagal didekripsi.")
+                    except Exception as e:
+                        st.error(f"Terjadi kegagalan penandatanganan: {e}")
 
     with col_s2:
-        st.markdown("##### 3. Hasil Dokumen Bertanda Tangan")
-        if "signed_pdf_result" in st.session_state:
-            meta = st.session_state["signed_meta"]
-            latest_sig = meta["signatures"][-1]
-            
-            st.download_button(
-                label="Unduh PDF Bertanda Tangan Resmi (.pdf)",
-                data=st.session_state["signed_pdf_result"],
-                file_name=f"signed_{pdf_file.name if pdf_file else 'document'}.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True,
-            )
-            
-            st.markdown("**Bukti Tanda Tangan Kriptografis:**")
-            st.write(f"• **Penandatangan:** {latest_sig['signer']} ({latest_sig['id']})")
-            st.write(f"• **Institusi:** {latest_sig['inst']}")
-            st.write(f"• **Waktu:** {latest_sig['date']}")
-            st.write(f"• **Total Tanda Tangan:** {meta['total_signers']} pihak")
-            
-            st.caption("Nilai Hash SHA-256 Dokumen:")
-            st.markdown(f'<div class="hash-display">{meta["doc_hash"]}</div>', unsafe_allow_html=True)
-            
-            st.caption("Signature ECDSA (Base64):")
-            st.markdown(f'<div class="hash-display">{latest_sig["signature"][:48]}...</div>', unsafe_allow_html=True)
-        else:
-            st.caption("Dokumen PDF hasil tanda tangan beserta ringkasan metadata akan ditampilkan di sini.")
+        with st.container(border=True):
+            st.markdown("##### 3. Dokumen Hasil Penandatanganan")
+            if "signed_pdf_result" in st.session_state:
+                meta = st.session_state["signed_meta"]
+                latest_sig = meta["signatures"][-1]
+                
+                st.download_button(
+                    label="Unduh PDF Bertanda Tangan Resmi (.pdf)",
+                    data=st.session_state["signed_pdf_result"],
+                    file_name=f"signed_{pdf_file.name if pdf_file else 'document'}.pdf",
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True,
+                )
+                
+                st.markdown("**Metadata Penandatangan Terdaftar:**")
+                st.write(f"• **Penandatangan:** {latest_sig['signer']} ({latest_sig['id']})")
+                st.write(f"• **Institusi:** {latest_sig['inst']}")
+                st.write(f"• **Waktu:** {latest_sig['date']}")
+                st.write(f"• **Total Penandatangan:** {meta['total_signers']} pihak")
+                
+                st.caption("Digest SHA-256 Dokumen:")
+                st.markdown(f'<div class="hash-badge">{meta["doc_hash"]}</div>', unsafe_allow_html=True)
+                
+                st.caption("Tanda Tangan Digital ECDSA (Base64):")
+                st.markdown(f'<div class="hash-badge">{latest_sig["signature"][:40]}... (Panjang: {len(latest_sig["signature"])} Karakter)</div>', unsafe_allow_html=True)
+            else:
+                st.caption("Dokumen PDF bertanda tangan dan ringkasan metadata kriptografis akan ditampilkan di sini.")
 
-# ----------------- TAB 3: VERIFIKASI DOKUMEN -----------------
+# ==============================================================================
+# TAB 3: VERIFIKASI INTEGRITAS DOKUMEN (VERIFICATION)
+# ==============================================================================
 with tab3:
-    st.markdown("#### Verifikasi Keaslian & Integritas Dokumen")
+    st.subheader("Verifikasi Keaslian & Uji Integritas Dokumen")
     st.write(
-        "Unggah dokumen PDF bertanda tangan untuk memvalidasi keaslian tanda tangan dan memastikan "
-        "tidak terdapat perubahan isi berkas bahkan sebesar 1 byte sejak ditandatangani."
+        "Unggah dokumen PDF untuk menguji keabsahan tanda tangan digital serta memastikan "
+        "tidak terdapat manipulasi isi dokumen (bahkan perubahan sebesar 1 byte)."
     )
     
-    col_v1, col_v2 = st.columns([1.1, 1.2])
+    col_v1, col_v2 = st.columns([1.1, 1.2], gap="large")
     with col_v1:
-        st.markdown("##### 1. Unggah Berkas yang Akan Diverifikasi")
-        verify_pdf_file = st.file_uploader(
-            "Pilih Berkas PDF Bertanda Tangan:",
-            type=["pdf"],
-            key="pdf_upload_verify"
-        )
-        
-        with st.expander("Uji Kunci Publik Spesifik (Skenario Pengujian Kunci Palsu)"):
-            st.caption(
-                "Opsi ini digunakan saat pengujian untuk membuktikan sistem dapat menolak "
-                "verifikasi jika diberikan Public Key yang tidak cocok dengan penandatangan."
-            )
-            custom_pub_file = st.file_uploader(
-                "Unggah Kunci Publik Penguji (.pem):",
-                type=["pem", "pub"],
-                key="pub_upload_verify"
-            )
-        
-        btn_verify = st.button("Jalankan Verifikasi Integritas", type="primary", use_container_width=True)
-        if btn_verify:
-            if not verify_pdf_file:
-                st.error("Silakan pilih berkas PDF yang ingin diverifikasi.")
-            else:
-                with st.spinner("Memeriksa struktur integritas berkas dan mencocokkan digest SHA-256..."):
-                    pdf_bytes_to_verify = verify_pdf_file.getvalue()
-                    custom_pub_bytes = custom_pub_file.getvalue() if custom_pub_file else None
-                    
-                    res = verify_pdf_document(pdf_bytes_to_verify, custom_public_key_pem=custom_pub_bytes)
-                    st.session_state["verify_result"] = res
+        with st.container(border=True):
+            st.markdown("##### 1. Berkas Pengujian")
+            verify_file = st.file_uploader("Pilih Berkas PDF Bertanda Tangan:", type=["pdf"], key="pdf_verify_upload")
+            
+            with st.expander("Uji Kunci Publik Tertentu (Demonstrasi Penolakan Kunci Palsu)"):
+                st.caption("Gunakan opsi ini saat demonstrasi untuk membuktikan bahwa sistem menolak verifikasi jika menggunakan Public Key milik pihak lain.")
+                custom_pub_upload = st.file_uploader("Unggah Kunci Publik Penguji (.pem):", type=["pem", "pub"], key="pub_custom_upload")
+
+            btn_verify_act = st.button("Jalankan Verifikasi Integritas", type="primary", use_container_width=True)
+            if btn_verify_act:
+                if not verify_file:
+                    st.error("Silakan pilih berkas PDF yang ingin diverifikasi.")
+                else:
+                    with st.spinner("Memvalidasi blok integritas kriptografis dan mencocokkan digest SHA-256..."):
+                        pdf_data = verify_file.getvalue()
+                        custom_pub_data = custom_pub_upload.getvalue() if custom_pub_upload else None
+                        
+                        audit_res = verify_pdf_document(pdf_data, custom_public_key_pem=custom_pub_data)
+                        st.session_state["verify_result"] = audit_res
 
     with col_v2:
-        st.markdown("##### 2. Laporan Audit Kriptografis")
-        if "verify_result" in st.session_state:
-            res = st.session_state["verify_result"]
-            
-            if res["status"] == "VALID":
-                st.markdown(f"""
-                <div class="cert-box-valid">
-                    <div class="cert-title-valid">STATUS: DOKUMEN OTENTIK & UTUH (VALID)</div>
-                    <p style="margin: 0; color: #065F46; font-size: 0.95rem;">
-                        {res["message"]} Seluruh tanda tangan digital terbukti sah dan berkas tidak mengalami manipulasi.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("##### 2. Laporan Audit Kriptografis")
+            if "verify_result" in st.session_state:
+                res = st.session_state["verify_result"]
                 
-                st.markdown("**Daftar Penandatangan Sah:**")
-                for s in res.get("signers", []):
-                    st.write(f"• **{s['signer_name']}** ({s['signer_id']}) — *{s['institution']}* — Tanggal: {s['date']}")
-                
-                st.caption("Digest SHA-256 Dihitung:")
-                st.markdown(f'<div class="hash-display">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
+                if res["status"] == "VALID":
+                    st.markdown(f"""
+                    <div class="cert-audit-valid">
+                        <div class="cert-audit-title-valid">STATUS: DOKUMEN OTENTIK & UTUH (VALID)</div>
+                        <div style="color: #065F46; font-size: 0.95rem;">
+                            {res["message"]} Dokumen dipastikan asli dari penandatangan terdaftar dan belum mengalami perubahan apapun.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("**Daftar Penandatangan Sah:**")
+                    for s in res.get("signers", []):
+                        st.write(f"• **{s['signer_name']}** ({s['signer_id']}) — *{s['institution']}* — Tanggal: {s['date']}")
+                    
+                    st.caption("Digest SHA-256 Terverifikasi:")
+                    st.markdown(f'<div class="hash-badge">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
 
-            elif res["status"] == "TAMPERED":
-                st.markdown(f"""
-                <div class="cert-box-tampered">
-                    <div class="cert-title-tampered">PERINGATAN: INTEGRITAS RUSAK / DOKUMEN DIMANIPULASI</div>
-                    <p style="margin: 0; color: #991B1B; font-size: 0.95rem;">
-                        {res["message"]} Nilai hash berkas yang diuji berbeda dengan nilai hash saat penandatanganan awal.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.caption("Perbandingan Nilai Hash SHA-256:")
-                st.markdown(f'**Hash Berkas Saat Ini:**<div class="hash-display">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
-                st.markdown(f'**Hash Asli Tanda Tangan:**<div class="hash-display">{res.get("expected_hash")}</div>', unsafe_allow_html=True)
+                elif res["status"] == "TAMPERED":
+                    st.markdown(f"""
+                    <div class="cert-audit-tampered">
+                        <div class="cert-audit-title-tampered">PERINGATAN: INTEGRITAS RUSAK / DOKUMEN DIMANIPULASI</div>
+                        <div style="color: #991B1B; font-size: 0.95rem;">
+                            {res["message"]} Nilai hash isi berkas yang dibaca berbeda dengan hash saat proses penandatanganan awal.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.caption("Nilai Hash SHA-256 Berkas Saat Ini (Hasil Manipulasi):")
+                    st.markdown(f'<div class="hash-badge">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
+                    
+                    st.caption("Nilai Hash Asli yang Ditandatangani:")
+                    st.markdown(f'<div class="hash-badge">{res.get("expected_hash")}</div>', unsafe_allow_html=True)
 
-            elif res["status"] == "KEY_MISMATCH":
-                st.markdown(f"""
-                <div class="cert-box-tampered">
-                    <div class="cert-title-tampered">VERIFIKASI GAGAL: KUNCI PUBLIK TIDAK SESUAI</div>
-                    <p style="margin: 0; color: #991B1B; font-size: 0.95rem;">
-                        {res["message"]} Tanda tangan digital pada dokumen bukan berasal dari pemilik Kunci Publik yang diberikan.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                elif res["status"] == "KEY_MISMATCH":
+                    st.markdown(f"""
+                    <div class="cert-audit-tampered">
+                        <div class="cert-audit-title-tampered">VERIFIKASI GAGAL: KUNCI PUBLIK TIDAK COCOK</div>
+                        <div style="color: #991B1B; font-size: 0.95rem;">
+                            {res["message"]} Tanda tangan digital pada dokumen ini bukan milik pemilik Kunci Publik yang Anda berikan.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.warning(res["message"])
             else:
-                st.warning(res["message"])
-        else:
-            st.caption("Hasil audit integritas dokumen akan muncul di sini setelah tombol verifikasi ditekan.")
+                st.caption("Hasil audit integritas dokumen akan muncul di panel ini setelah verifikasi dieksekusi.")
 
-# ----------------- TAB 4: BENCHMARK & PENGUJIAN -----------------
+# ==============================================================================
+# TAB 4: BENCHMARK & PENGUJIAN KUANTITATIF (BENCHMARK)
+# ==============================================================================
 with tab4:
-    st.markdown("#### Pengujian Kuantitatif & Benchmark Kriptografi")
+    st.subheader("Pengujian Kuantitatif & Benchmark Kriptografi")
     st.write(
-        "Sesuai ketentuan **Bagian 4 Panduan UTS Keamanan Informasi**, dilakukan pengujian berulang minimal 30 kali "
-        "untuk mengukur waktu komputasi penandatanganan (*signing*), verifikasi, efisiensi ukuran kunci, serta ketahanan terhadap manipulasi berkas 1-byte."
+        "Sesuai ketentuan **Bagian 4 Panduan Tugas UTS Keamanan Informasi**, dilakukan pengujian berulang minimal 30 kali iterasi "
+        "untuk mengukur performa waktu penandatanganan (*signing*), verifikasi, efisiensi ukuran kunci, serta ketahanan deteksi manipulasi berkas 1-byte."
     )
     
-    col_ctrl1, col_ctrl2 = st.columns([3, 2])
+    col_ctrl1, col_ctrl2 = st.columns([3, 2], gap="large")
     with col_ctrl1:
-        st.write("Jalankan loop pengujian otomatis 30 kali secara langsung di depan penguji untuk membuktikan keakuratan metrik.")
+        st.write("Jalankan siklus pengujian otomatis langsung di hadapan penguji untuk membuktikan keakuratan metrik secara real-time.")
     with col_ctrl2:
-        btn_run_bench = st.button("Jalankan Benchmark Langsung (30x)", type="primary", use_container_width=True)
+        btn_run_bench = st.button("Jalankan Siklus Pengujian 30x", type="primary", use_container_width=True)
 
     if btn_run_bench:
         with st.spinner("Mengeksekusi 30 siklus penandatanganan dan verifikasi ECDSA NIST P-256..."):
@@ -467,7 +536,7 @@ with tab4:
                 st.session_state["benchmark_result"] = res
                 st.success("Seluruh 30 iterasi pengujian dan 10 skenario uji tamper berhasil diselesaikan.")
             except Exception as e:
-                st.error(f"Gagal mengeksekusi benchmark: {e}")
+                st.error(f"Gagal menjalankan benchmark: {e}")
 
     res = st.session_state.get("benchmark_result")
     
@@ -483,13 +552,13 @@ with tab4:
 
     if res and "benchmark_data" in res:
         df_bench = pd.DataFrame(res["benchmark_data"])
-        st.markdown("##### Grafik Distribusi Waktu Komputasi (30 Iterasi)")
+        st.markdown("##### Distribusi Waktu Komputasi Tiap Iterasi (ms)")
         st.line_chart(
             df_bench.set_index("iterasi")[["waktu_signing_ms", "waktu_verifikasi_ms"]],
             color=["#0B3C5D", "#059669"]
         )
         
-        st.markdown("##### Tabel Uji Ketahanan Terhadap Manipulasi Berkas (Tamper Detection)")
+        st.markdown("##### Matriks Hasil Uji Ketahanan Manipulasi Dokumen (Tamper Test)")
         df_tamper = pd.DataFrame(res["tamper_results"])
         df_tamper["status_deteksi"] = df_tamper["detected"].apply(lambda x: "BERHASIL DITOLAK (SUKSES)" if x else "GAGAL")
         st.dataframe(
@@ -503,7 +572,7 @@ with tab4:
             use_container_width=True
         )
 
-    st.markdown("##### Berkas Hasil Pengujian Resmi:")
+    st.markdown("##### Berkas Rekapitulasi Data Pengujian Resmi:")
     if os.path.exists("data_pengujian_benchmark.xlsx"):
         with open("data_pengujian_benchmark.xlsx", "rb") as f:
             st.download_button(
@@ -513,3 +582,85 @@ with tab4:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+
+# ==============================================================================
+# TAB 5: TENTANG PROYEK (ABOUT & ACADEMIC DISCLOSURE)
+# ==============================================================================
+with tab5:
+    st.subheader("Tentang Proyek SignaCerta")
+    
+    col_a1, col_a2 = st.columns([1.2, 1], gap="large")
+    with col_a1:
+        with st.container(border=True):
+            st.markdown("##### 1. Latar Belakang & Urgensi Masalah")
+            st.write(
+                "Dokumen elektronik dalam format PDF sangat rentan terhadap manipulasi isi, pemalsuan stempel, "
+                "dan peniruan tanda tangan visual biasa (gambar *scan* tanda tangan). Tanpa skema kriptografis yang kuat, "
+                "keaslian berkas administratif tidak dapat dibuktikan secara hukum dan teknis."
+            )
+            st.write(
+                "**SignaCerta** mengimplementasikan algoritma asimetris modern **ECDSA (Elliptic Curve Digital Signature Algorithm)** "
+                "dengan kurva **NIST P-256 (secp256r1)** dan fungsi ringkasan pesan **SHA-256**. Keunggulan kurva eliptik ini adalah "
+                "memberikan tingkat keamanan setara RSA 3072-bit namun dengan ukuran kunci dan tanda tangan yang jauh lebih ringkas "
+                "serta komputasi yang efisien pada perangkat pengguna."
+            )
+            
+            st.markdown("##### 2. Alur Kerja Kriptografi Dokumen")
+            st.markdown("""
+            1. **Pembacaan & Ringkasan Dokumen:** Berkas PDF dibaca secara biner, kemudian dihitung nilai ringkasannya menggunakan fungsi *Secure Hash Algorithm* 256-bit (**SHA-256**).
+            2. **Penandatanganan Digital:** Digest SHA-256 ditandatangani menggunakan **Private Key** pemilik melalui algoritma matematika kurva eliptik ECDSA.
+            3. **Penyematan QR-Code & Lencana Visual:** Metadata penandatangan, timestamp, dan tanda tangan digital dikemas ke dalam penanda visual QR-Code dan disematkan ke halaman PDF.
+            4. **Audit Integritas:** Saat verifikasi, berkas dibaca ulang untuk menghitung kembali hash-nya. Bila terdapat perbedaan sekecil 1 byte, verifikasi dinyatakan **GAGAL / TAMPERED**.
+            """)
+
+    with col_a2:
+        with st.container(border=True):
+            st.markdown("##### 3. Tim Pengembang & Kontribusi")
+            st.markdown("""
+            * **Fachri Ridhwan Imani** (247006111140)  
+              *Peran:* Key Management, Cryptographic Engine (ECDSA P-256), Unit Testing.
+            * **Wardah Nurwaffiq** (247006111150)  
+              *Peran:* PDF Integration, Visual Signature Badge, QR-Code Stamping.
+            * **Mahardika Rajbi Firdaus** (247006111148)  
+              *Peran:* Verification Engine, Tamper Auditing, Quantitative Benchmark (30x).
+            """)
+            
+            st.markdown("##### 4. Referensi Riset Pembina")
+            st.caption("Sitasi publikasi ilmiah dosen pengampu (format APA 7 via Mendeley):")
+            st.markdown("""
+            * Gunawan, R., Rahmatulloh, A., & Rizal, R. (2024). Implementasi Digital Signature Pada Dokumen Elektronik Berbasis QR-Code. *STRING (Satuan Tulisan Riset dan Inovasi Teknologi)*.
+            * Raihan, & Rahmatulloh, A. (2026). *Implementation and Performance Analysis of Elliptic Curve Digital Signature Algorithm (ECDSA) for Academic Document Security*. Universitas Siliwangi.
+            """)
+            
+            st.markdown("##### 5. Pernyataan Integritas Akademik (AI Disclosure)")
+            st.caption(
+                "Sesuai ketentuan Bagian 10 Pedoman Tugas UTS Keamanan Informasi: "
+                "Asisten AI digunakan secara bertanggung jawab sebagai pendukung perancangan logika dasar dan refaktor antarmuka pengguna. "
+                "Seluruh implementasi modul matematika, pengujian kuantitatif, dan pengujian manipulasi telah divalidasi dan dikuasai sepenuhnya oleh tim pengembang."
+            )
+
+# ----------------- FOOTER INSTITUSIONAL -----------------
+st.markdown("""
+<div class="footer-container">
+    <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr; gap: 2rem;">
+        <div>
+            <div class="footer-title">SignaCerta • Universitas Siliwangi</div>
+            <div>Sistem Informasi Otentikasi dan Penjaminan Integritas Dokumen Elektronik PDF berbasis Kriptografi Kunci Publik ECDSA NIST P-256.</div>
+            <div style="margin-top: 0.5rem; font-size: 0.78rem;">Jurusan Informatika • Fakultas Teknik • Universitas Siliwangi</div>
+        </div>
+        <div>
+            <div class="footer-title">Akademik & Pengampu</div>
+            <div>Mata Kuliah: Keamanan Informasi (20261)</div>
+            <div>Dosen Pengampu: <b>Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.</b></div>
+            <div>Tugas Proyek Tengah Semester (UTS) — Topik D</div>
+        </div>
+        <div>
+            <div class="footer-title">Standar Keamanan</div>
+            <div>• NIST FIPS 186-4 (Digital Signature Standard)</div>
+            <div>• NIST FIPS 180-4 (Secure Hash Standard SHA-256)</div>
+            <div>• RFC 5280 / PKCS#8 Key Protection (AES-256)</div>
+            <div style="margin-top: 0.5rem; font-size: 0.78rem;">© 2026 SignaCerta Tim Pengembang</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
