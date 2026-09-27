@@ -29,7 +29,7 @@ from verifier import verify_pdf_document
 st.set_page_config(
     page_title="SignaCerta — Otentikasi PDF (Universitas Siliwangi)",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ----------------- CSS DESAIN INSTITUSIONAL & SKALA RESPONSIF -----------------
@@ -47,6 +47,65 @@ st.markdown("""
         --border-ui: #E2E8F0;
     }
     
+    
+    /* Sidebar Modern Navbar Samping */
+    section[data-testid="stSidebar"] {
+        background-color: #F8FAFC !important;
+        border-right: 1px solid #E2E8F0 !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 0.35rem !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 6px !important;
+        padding: 0.55rem 0.75rem !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        color: #334155 !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        transition: all 0.15s ease-in-out !important;
+        width: 100% !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background-color: #EEF2F6 !important;
+        color: #0B3C5D !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background-color: #0B3C5D !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 1px 3px 0 rgba(11, 60, 93, 0.25) !important;
+    }
+    
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) span,
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+    }
+    
+    /* Top Bar Breadcrumb */
+    .top-bar-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    }
+
     /* Sembunyikan Header Bawaan Streamlit yang menutupi bagian atas */
     header[data-testid="stHeader"] {
         display: none !important;
@@ -246,11 +305,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------- TOP NAVBAR INSTITUSIONAL -----------------
-st.markdown("""
-<div class="navbar-container">
-    <div class="navbar-brand-group">
-        <svg class="navbar-logo-img" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+# ----------------- NAVBAR SAMPING (SIDEBAR NAVIGATION) -----------------
+with st.sidebar:
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <svg style="width: 40px; height: 40px; flex-shrink: 0;" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="44" height="44" rx="8" fill="#0B3C5D"/>
             <circle cx="22" cy="22" r="17" stroke="#D97706" stroke-width="1.5"/>
             <circle cx="22" cy="22" r="14" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="2 2"/>
@@ -258,9 +317,47 @@ st.markdown("""
             <path d="M16 28H28V30C28 30.5523 27.5523 31 27 31H17C16.4477 31 16 30.5523 16 30V28Z" fill="#D97706"/>
         </svg>
         <div>
-            <div class="navbar-brand-title">SignaCerta</div>
-            <div class="navbar-brand-desc">Sistem Otentikasi dan Tanda Tangan Digital PDF • Universitas Siliwangi</div>
+            <div style="font-weight: 800; font-size: 1.25rem; color: #0B3C5D; line-height: 1.1;">SignaCerta</div>
+            <div style="font-size: 0.72rem; color: #64748B; font-weight: 500;">Universitas Siliwangi</div>
         </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("###### NAVIGASI SISTEM")
+    nav_choice = st.radio(
+        "Navigasi Modul",
+        [
+            "1. Pembangkitan Kunci",
+            "2. Penandatanganan Dokumen",
+            "3. Verifikasi Integritas",
+            "4. Uji Kuantitatif & Benchmark",
+            "Tentang Proyek",
+        ],
+        label_visibility="collapsed",
+        key="nav_sidebar"
+    )
+    
+    st.divider()
+    st.markdown("###### KONTEKS AKADEMIK")
+    st.caption("**Mata Kuliah:** Keamanan Informasi (20261)")
+    st.caption("**Dosen Pengampu:** Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.")
+    
+    st.markdown("###### TIM PENGEMBANG")
+    st.caption("• Fachri Ridhwan Imani (247006111140)")
+    st.caption("• Wardah Nurwaffiq (247006111150)")
+    st.caption("• Mahardika Rajbi Firdaus (247006111148)")
+    
+    st.divider()
+    st.caption("**Standar Kriptografi:**")
+    st.caption("• NIST FIPS 186-4 (ECDSA P-256)")
+    st.caption("• NIST FIPS 180-4 (SHA-256)")
+    st.caption("• RFC 5280 / PKCS#8")
+
+# ----------------- TOP BAR BREADCRUMB -----------------
+st.markdown(f"""
+<div class="top-bar-container">
+    <div style="font-size: 0.95rem; font-weight: 600; color: #475569;">
+        <span style="color: #0B3C5D; font-weight: 700;">SignaCerta</span> &nbsp;/&nbsp; <span style="color: #0B3C5D;">{nav_choice}</span>
     </div>
     <div class="navbar-badge">
         NIST P-256 (secp256r1) • SHA-256 • FIPS 186-4
@@ -268,19 +365,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ----------------- SIDE-BY-SIDE HORIZONTAL NAVIGATION -----------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "1. Pembangkitan Kunci",
-    "2. Penandatanganan Dokumen",
-    "3. Verifikasi Integritas",
-    "4. Uji Kuantitatif & Benchmark",
-    "Tentang Proyek",
-])
-
 # ==============================================================================
 # TAB 1: PEMBANGKITAN KUNCI (KEY MANAGEMENT)
 # ==============================================================================
-with tab1:
+if nav_choice == "1. Pembangkitan Kunci":
     st.subheader("Pembangkitan Pasangan Kunci Asimetris ECDSA NIST P-256")
     st.write(
         "Kunci privat (*Private Key*) disimpan secara rahasia untuk menandatangani berkas, "
@@ -352,7 +440,7 @@ with tab1:
 # ==============================================================================
 # TAB 2: PENANDATANGANAN DOKUMEN (SIGNING)
 # ==============================================================================
-with tab2:
+elif nav_choice == "2. Penandatanganan Dokumen":
     st.subheader("Penandatanganan Dokumen PDF & Pembubuhan Lencana QR-Code")
     st.write(
         "Unggah dokumen PDF asli, tentukan identitas resmi penandatangan, lalu pilih letak penempelan lencana QR-Code. "
@@ -469,7 +557,7 @@ with tab2:
 # ==============================================================================
 # TAB 3: VERIFIKASI INTEGRITAS DOKUMEN (VERIFICATION)
 # ==============================================================================
-with tab3:
+elif nav_choice == "3. Verifikasi Integritas":
     st.subheader("Verifikasi Keaslian & Uji Integritas Dokumen")
     st.write(
         "Unggah dokumen PDF untuk menguji keabsahan tanda tangan digital serta memastikan "
@@ -554,7 +642,7 @@ with tab3:
 # ==============================================================================
 # TAB 4: BENCHMARK & PENGUJIAN KUANTITATIF (BENCHMARK)
 # ==============================================================================
-with tab4:
+elif nav_choice == "4. Uji Kuantitatif & Benchmark":
     st.subheader("Pengujian Kuantitatif & Benchmark Kriptografi")
     st.write(
         "Sesuai ketentuan **Bagian 4 Panduan Tugas UTS Keamanan Informasi**, dilakukan pengujian berulang minimal 30 kali iterasi "
@@ -625,7 +713,7 @@ with tab4:
 # ==============================================================================
 # TAB 5: TENTANG PROYEK (ABOUT & ACADEMIC DISCLOSURE)
 # ==============================================================================
-with tab5:
+elif nav_choice == "Tentang Proyek":
     st.subheader("Tentang Proyek SignaCerta")
     
     col_a1, col_a2 = st.columns([1.2, 1], gap="large")
