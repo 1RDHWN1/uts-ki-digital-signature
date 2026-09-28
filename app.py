@@ -27,6 +27,10 @@ st.set_page_config(
     initial_sidebar_state="auto",
 )
 
+# ----------------- FUNGSI NAVIGASI SHORTCUT -----------------
+def navigate_to(step_name):
+    st.session_state["nav_sidebar"] = step_name
+
 # ----------------- SIDEBAR & NAVIGASI SISTEM -----------------
 with st.sidebar:
     st.markdown("""
@@ -840,7 +844,14 @@ if nav_choice == "1. Pembangkitan Kunci":
                         mime="application/x-pem-file",
                         use_container_width=True,
                     )
-                st.info("Kunci privat Anda siap digunakan. Beralihlah ke tab '2. Penandatanganan Dokumen' untuk menandatangani berkas.")
+                st.markdown("---")
+                st.button(
+                    "Lanjut ke Tahap 2: Penandatanganan Dokumen →",
+                    type="primary",
+                    use_container_width=True,
+                    on_click=navigate_to,
+                    args=("2. Penandatanganan Dokumen",),
+                )
             else:
                 st.caption("Berkas kunci (.pem) dan sidik jari kriptografis akan tampil di sini setelah dibuat.")
 
@@ -959,6 +970,24 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 
                 st.caption("Tanda Tangan Digital ECDSA (Base64):")
                 st.markdown(f'<div class="hash-badge">{latest_sig["signature"][:40]}... (Panjang: {len(latest_sig["signature"])} Karakter)</div>', unsafe_allow_html=True)
+                
+                st.markdown("---")
+                col_btn_prev, col_btn_next = st.columns(2)
+                with col_btn_prev:
+                    st.button(
+                        "← Kembali ke Tahap 1 (Kunci)",
+                        use_container_width=True,
+                        on_click=navigate_to,
+                        args=("1. Pembangkitan Kunci",),
+                    )
+                with col_btn_next:
+                    st.button(
+                        "Lanjut ke Tahap 3: Verifikasi Integritas →",
+                        type="primary",
+                        use_container_width=True,
+                        on_click=navigate_to,
+                        args=("3. Verifikasi Integritas",),
+                    )
             else:
                 st.caption("Dokumen PDF bertanda tangan dan ringkasan metadata kriptografis akan ditampilkan di sini.")
 
@@ -976,7 +1005,21 @@ elif nav_choice == "3. Verifikasi Integritas":
     with col_v1:
         with st.container(border=True):
             st.markdown("##### 1. Berkas Pengujian")
-            verify_file = st.file_uploader("Pilih Berkas PDF Bertanda Tangan:", type=["pdf"], key="pdf_verify_upload")
+            
+            use_recent_signed = False
+            if "signed_pdf_result" in st.session_state:
+                use_recent_signed = st.checkbox(
+                    "Gunakan berkas PDF hasil penandatanganan dari Tahap 2",
+                    value=True,
+                    help="Praktis untuk pengujian langsung tanpa perlu mengunduh dan mengunggah ulang berkas PDF.",
+                )
+                if use_recent_signed:
+                    st.info("Berkas aktif: Dokumen PDF resmi dari Tahap 2 siap diverifikasi.")
+            
+            if not use_recent_signed:
+                verify_file = st.file_uploader("Pilih Berkas PDF Bertanda Tangan:", type=["pdf"], key="pdf_verify_upload")
+            else:
+                verify_file = None
             
             with st.expander("Uji Kunci Publik Tertentu (Demonstrasi Penolakan Kunci Palsu)"):
                 st.caption("Gunakan opsi ini saat demonstrasi untuk membuktikan bahwa sistem menolak verifikasi jika menggunakan Public Key milik pihak lain.")
@@ -984,13 +1027,17 @@ elif nav_choice == "3. Verifikasi Integritas":
 
             btn_verify_act = st.button("Jalankan Verifikasi Integritas", type="primary", use_container_width=True)
             if btn_verify_act:
-                if not verify_file:
+                pdf_data = None
+                if use_recent_signed and "signed_pdf_result" in st.session_state:
+                    pdf_data = st.session_state["signed_pdf_result"]
+                elif verify_file:
+                    pdf_data = verify_file.getvalue()
+                    
+                if not pdf_data:
                     st.error("Silakan pilih berkas PDF yang ingin diverifikasi.")
                 else:
                     with st.spinner("Memvalidasi blok integritas kriptografis dan mencocokkan digest SHA-256..."):
-                        pdf_data = verify_file.getvalue()
                         custom_pub_data = custom_pub_upload.getvalue() if custom_pub_upload else None
-                        
                         audit_res = verify_pdf_document(pdf_data, custom_public_key_pem=custom_pub_data)
                         st.session_state["verify_result"] = audit_res
 
@@ -1044,6 +1091,24 @@ elif nav_choice == "3. Verifikasi Integritas":
                     """, unsafe_allow_html=True)
                 else:
                     st.warning(res["message"])
+                
+                st.markdown("---")
+                col_v_prev, col_v_next = st.columns(2)
+                with col_v_prev:
+                    st.button(
+                        "← Kembali ke Tahap 2 (Tanda Tangan)",
+                        use_container_width=True,
+                        on_click=navigate_to,
+                        args=("2. Penandatanganan Dokumen",),
+                    )
+                with col_v_next:
+                    st.button(
+                        "Lanjut ke Tahap 4: Uji Benchmark →",
+                        type="primary",
+                        use_container_width=True,
+                        on_click=navigate_to,
+                        args=("4. Uji Kuantitatif & Benchmark",),
+                    )
             else:
                 st.caption("Hasil audit integritas dokumen akan muncul di panel ini setelah verifikasi dieksekusi.")
 
@@ -1117,6 +1182,24 @@ elif nav_choice == "4. Uji Kuantitatif & Benchmark":
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+            
+    st.markdown("---")
+    col_b_prev, col_b_next = st.columns(2)
+    with col_b_prev:
+        st.button(
+            "← Kembali ke Verifikasi Integritas (Tahap 3)",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("3. Verifikasi Integritas",),
+        )
+    with col_b_next:
+        st.button(
+            "Pelajari Selengkapnya: Tentang Proyek →",
+            type="primary",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("Tentang Proyek",),
+        )
 
 # ==============================================================================
 # TAB 5: TENTANG PROYEK (ABOUT & ACADEMIC DISCLOSURE)
@@ -1188,6 +1271,24 @@ elif nav_choice == "Tentang Proyek":
                 "Asisten AI digunakan secara bertanggung jawab sebagai pendukung perancangan logika dasar dan refaktor antarmuka pengguna. "
                 "Seluruh implementasi modul matematika, pengujian kuantitatif, dan pengujian manipulasi telah divalidasi dan dikuasai sepenuhnya oleh tim pengembang."
             )
+            
+    st.markdown("---")
+    col_t_prev, col_t_next = st.columns(2)
+    with col_t_prev:
+        st.button(
+            "← Kembali ke Uji Benchmark (Tahap 4)",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("4. Uji Kuantitatif & Benchmark",),
+        )
+    with col_t_next:
+        st.button(
+            "Mulai Pengujian Ulang: Tahap 1 (Pembangkitan Kunci) →",
+            type="primary",
+            use_container_width=True,
+            on_click=navigate_to,
+            args=("1. Pembangkitan Kunci",),
+        )
 
 # ----------------- FOOTER INSTITUSIONAL -----------------
 st.markdown("""
