@@ -24,7 +24,7 @@ from verifier import verify_pdf_document
 st.set_page_config(
     page_title="SignaCerta — Otentikasi PDF (Universitas Siliwangi)",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 # ----------------- SIDEBAR & NAVIGASI SISTEM -----------------
