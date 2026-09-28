@@ -877,6 +877,8 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                     pdf_bytes_tmp = pdf_file.getvalue()
                     reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
                     st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
+                    if b"---SIG-METADATA-START---" in pdf_bytes_tmp:
+                        st.info("Dokumen ini telah memiliki tanda tangan sebelumnya. Sistem akan membubuhkan tanda tangan berjenjang (Multiple Signers) sebagai penandatangan berikutnya tanpa merusak tanda tangan terdahulu.")
                 except Exception:
                     pass
 
@@ -960,10 +962,15 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 )
                 
                 st.markdown("**Metadata Penandatangan Terdaftar:**")
-                st.write(f"• **Penandatangan:** {latest_sig.get('signer', '-')} ({latest_sig.get('id', '-')})")
+                st.write(f"• **Penandatangan Terakhir:** {latest_sig.get('signer', '-')} ({latest_sig.get('id', '-')})")
                 st.write(f"• **Institusi:** {latest_sig.get('institution', latest_sig.get('inst', '-'))}")
                 st.write(f"• **Waktu:** {latest_sig.get('date', '-')}")
                 st.write(f"• **Total Penandatangan:** {meta.get('total_signers', len(meta.get('signatures', [])))} pihak")
+                
+                if meta.get("total_signers", 1) > 1:
+                    st.caption("Daftar seluruh penandatangan terdaftar pada berkas ini:")
+                    for idx, s in enumerate(meta.get("signatures", []), 1):
+                        st.write(f"  {idx}. **{s.get('signer', '-')}** ({s.get('id', '-')}) — *{s.get('institution', '-')}*")
                 
                 st.caption("Digest SHA-256 Dokumen:")
                 st.markdown(f'<div class="hash-badge">{meta["doc_hash"]}</div>', unsafe_allow_html=True)
