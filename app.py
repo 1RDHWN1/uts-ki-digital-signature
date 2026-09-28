@@ -6,6 +6,7 @@ Dosen Pengampu: Ir. Alam Rahmatulloh, S.T., M.T., MCE., IPM.
 
 import io
 import os
+import json
 import streamlit as st
 import pandas as pd
 from pypdf import PdfReader
@@ -872,13 +873,19 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             pdf_file = st.file_uploader("Pilih Berkas PDF yang Akan Ditandatangani:", type=["pdf"], key="pdf_sign_upload")
             
             # Tampilkan info berkas instan jika diunggah
+            existing_signers_count = 0
             if pdf_file:
                 try:
                     pdf_bytes_tmp = pdf_file.getvalue()
                     reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
                     st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
                     if b"---SIG-METADATA-START---" in pdf_bytes_tmp:
-                        st.info("Dokumen ini telah memiliki tanda tangan sebelumnya. Sistem akan membubuhkan tanda tangan berjenjang (Multiple Signers) sebagai penandatangan berikutnya tanpa merusak tanda tangan terdahulu.")
+                        parts = pdf_bytes_tmp.split(b"---SIG-METADATA-START---")
+                        if len(parts) > 1:
+                            sub = parts[1].split(b"---SIG-METADATA-END---")[0]
+                            prev_meta = json.loads(sub.decode("utf-8"))
+                            existing_signers_count = prev_meta.get("total_signers", 1)
+                        st.info(f"Dokumen ini telah memiliki {existing_signers_count} tanda tangan sebelumnya. Sistem otomatis mengaktifkan mode tanda tangan berjenjang (Multiple Signers).")
                 except Exception:
                     pass
 
@@ -896,7 +903,25 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 signer_id = st.text_input("NPM / NIP / NIDN:", value=val_id, placeholder="Contoh: 247006111140", key="id_in")
             with ci_2:
                 institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
-                stamp_pos = st.selectbox("Posisi Lencana Tanda Tangan QR:", ["bottom-right", "bottom-left", "bottom-center"], key="pos_in")
+                
+                pos_options = ["bottom-right", "bottom-left", "bottom-center"]
+                default_pos_idx = 0
+                if existing_signers_count == 1:
+                    default_pos_idx = 1
+                elif existing_signers_count >= 2:
+                    default_pos_idx = 2
+                    
+                stamp_pos = st.selectbox(
+                    "Posisi Lencana Tanda Tangan QR:",
+                    pos_options,
+                    index=default_pos_idx,
+                    key="pos_in",
+                    help="Sistem otomatis memilih posisi yang kosong agar tidak menimpa tanda tangan pihak terdahulu.",
+                )
+                if existing_signers_count == 1 and stamp_pos == "bottom-right":
+                    st.caption("⚠️ Catatan: Posisi *bottom-right* kemungkinan telah ditempati penandatangan pertama. Disarankan memilih *bottom-left*.")
+                elif existing_signers_count >= 2 and stamp_pos in ["bottom-right", "bottom-left"]:
+                    st.caption("⚠️ Catatan: Posisi ini kemungkinan telah terisi. Disarankan memilih *bottom-center*.")
 
             st.markdown("---")
             st.markdown("###### Otorisasi Kunci Privat Penandatangan")
