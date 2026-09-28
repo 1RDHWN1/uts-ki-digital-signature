@@ -18,7 +18,7 @@ from crypto_engine import (
     load_private_key_pem,
     hash_bytes,
 )
-from pdf_stamper import sign_and_stamp_pdf
+from pdf_stamper import sign_and_stamp_pdf, SIG_MARKER_START, SIG_MARKER_END
 from verifier import verify_pdf_document
 
 # ----------------- KONFIGURASI HALAMAN -----------------
@@ -874,17 +874,17 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             
             # Tampilkan info berkas instan jika diunggah
             existing_signers_count = 0
+            pdf_bytes_tmp = None
             if pdf_file:
                 try:
                     pdf_bytes_tmp = pdf_file.getvalue()
                     reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
                     st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
-                    if b"---SIG-METADATA-START---" in pdf_bytes_tmp:
-                        parts = pdf_bytes_tmp.split(b"---SIG-METADATA-START---")
-                        if len(parts) > 1:
-                            sub = parts[1].split(b"---SIG-METADATA-END---")[0]
-                            prev_meta = json.loads(sub.decode("utf-8"))
-                            existing_signers_count = prev_meta.get("total_signers", 1)
+                    if SIG_MARKER_START in pdf_bytes_tmp and SIG_MARKER_END in pdf_bytes_tmp:
+                        parts = pdf_bytes_tmp.split(SIG_MARKER_START)
+                        sub = parts[1].split(SIG_MARKER_END)[0]
+                        prev_meta = json.loads(sub.decode("utf-8"))
+                        existing_signers_count = prev_meta.get("total_signers", len(prev_meta.get("signatures", [])))
                         st.info(f"Dokumen ini telah memiliki {existing_signers_count} tanda tangan sebelumnya. Sistem otomatis mengaktifkan mode tanda tangan berjenjang (Multiple Signers).")
                 except Exception:
                     pass
@@ -910,6 +910,12 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                     default_pos_idx = 1
                 elif existing_signers_count >= 2:
                     default_pos_idx = 2
+                
+                if pdf_file and pdf_bytes_tmp is not None:
+                    file_sig_key = f"{pdf_file.name}_{len(pdf_bytes_tmp)}"
+                    if st.session_state.get("last_uploaded_file_key") != file_sig_key:
+                        st.session_state["last_uploaded_file_key"] = file_sig_key
+                        st.session_state["pos_in"] = pos_options[default_pos_idx]
                     
                 stamp_pos = st.selectbox(
                     "Posisi Lencana Tanda Tangan QR:",
