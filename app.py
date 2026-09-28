@@ -960,10 +960,10 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 )
                 
                 st.markdown("**Metadata Penandatangan Terdaftar:**")
-                st.write(f"• **Penandatangan:** {latest_sig['signer']} ({latest_sig['id']})")
-                st.write(f"• **Institusi:** {latest_sig['inst']}")
-                st.write(f"• **Waktu:** {latest_sig['date']}")
-                st.write(f"• **Total Penandatangan:** {meta['total_signers']} pihak")
+                st.write(f"• **Penandatangan:** {latest_sig.get('signer', '-')} ({latest_sig.get('id', '-')})")
+                st.write(f"• **Institusi:** {latest_sig.get('institution', latest_sig.get('inst', '-'))}")
+                st.write(f"• **Waktu:** {latest_sig.get('date', '-')}")
+                st.write(f"• **Total Penandatangan:** {meta.get('total_signers', len(meta.get('signatures', [])))} pihak")
                 
                 st.caption("Digest SHA-256 Dokumen:")
                 st.markdown(f'<div class="hash-badge">{meta["doc_hash"]}</div>', unsafe_allow_html=True)
