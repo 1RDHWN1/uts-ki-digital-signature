@@ -42,3 +42,20 @@ test_files/
 .idea/
 .DS_Store
 Thumbs.db
+
+# KUNCI KRIPTOGRAFI - JANGAN PERNAH DI-COMMIT!
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa*
+private_key*
+public_key*
+keys/
+secrets/
+.env
+.env.*
+*token*
+*credential*
