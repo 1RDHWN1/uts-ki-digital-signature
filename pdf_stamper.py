@@ -131,7 +131,7 @@ def sign_and_stamp_pdf(
     institution: str = "Universitas Siliwangi",
     date_str: Optional[str] = None,
     position: str = "bottom-right",
-    verification_url_base: str = "https://uts-ki-digital-signature.streamlit.app",
+    verification_url_base: str = "https://signacerta.udincloud.me",
 ) -> Tuple[bytes, Dict[str, Any]]:
     """Membubuhkan tanda tangan visual (QR-Code badge) dan menyematkan blok integritas digital."""
     if date_str is None:

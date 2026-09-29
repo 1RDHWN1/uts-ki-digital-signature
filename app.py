@@ -20,6 +20,10 @@ from crypto_engine import (
 )
 from pdf_stamper import sign_and_stamp_pdf, SIG_MARKER_START, SIG_MARKER_END
 from verifier import verify_pdf_document
+from generic_signer import (
+    sign_generic_file,
+    verify_generic_file,
+)
 
 # ----------------- KONFIGURASI HALAMAN -----------------
 st.set_page_config(
@@ -31,6 +35,60 @@ st.set_page_config(
 # ----------------- FUNGSI NAVIGASI SHORTCUT -----------------
 def navigate_to(step_name):
     st.session_state["nav_sidebar"] = step_name
+
+
+# ----------------- SISTEM NOTIFIKASI POP-UP (TOAST) -----------------
+def show_toast(kind: str, title: str, message: str = "", duration: float = 5.0):
+    """Menyimpan notifikasi pop-up ke antrean session state.
+
+    Notifikasi ditampilkan sekali pada rerun berikutnya, lalu dihapus dari antrean
+    agar tidak muncul berulang setiap kali Streamlit melakukan rerun.
+    """
+    queue = st.session_state.setdefault("sc_toast_queue", [])
+    queue.append({"kind": kind, "title": title, "message": message, "duration": duration})
+
+
+def render_toasts():
+    """Merender seluruh notifikasi pop-up yang tertunda (sekali tampil, lalu dibersihkan).
+
+    Implementasi murni HTML+CSS (tanpa JavaScript) karena Streamlit menyaring tag
+    <script> pada st.markdown. Animasi muncul dan hilang otomatis dijalankan lewat
+    CSS @keyframes dengan durasi sesuai parameter ``duration``.
+    """
+    queue = st.session_state.get("sc_toast_queue") or []
+    if not queue:
+        return
+
+    icons = {
+        "success": '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+        "error": '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+        "warning": '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        "info": '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+    }
+
+    cards_html = []
+    for idx, item in enumerate(queue):
+        kind = item.get("kind", "info")
+        icon_svg = icons.get(kind, icons["info"])
+        dur = float(item.get("duration", 5.0) or 5.0)
+        safe_title = str(item.get("title", "")).replace("<", "&lt;").replace(">", "&gt;")
+        safe_msg = str(item.get("message", "")).replace("<", "&lt;").replace(">", "&gt;")
+        msg_html = f'<p class="sc-toast__msg">{safe_msg}</p>' if safe_msg else ""
+        cb_id = f"sc-toast-cb-{idx}"
+        cards_html.append(
+            f'<input type="checkbox" id="{cb_id}" class="sc-toast__closer">'
+            f'<div class="sc-toast sc-toast--{kind}" style="--sc-toast-life: {dur}s;" role="status">'
+            f'<div class="sc-toast__icon">{icon_svg}</div>'
+            f'<div class="sc-toast__body"><p class="sc-toast__title">{safe_title}</p>{msg_html}</div>'
+            f'<label class="sc-toast__close" for="{cb_id}" aria-label="Tutup">&#10005;</label>'
+            f'<div class="sc-toast__bar"></div>'
+            f'</div>'
+        )
+
+    toast_html = '<div class="sc-toast-wrap">' + "".join(cards_html) + '</div>'
+    st.markdown(toast_html, unsafe_allow_html=True)
+    st.session_state["sc_toast_queue"] = []
+
 
 # ----------------- SIDEBAR & NAVIGASI SISTEM -----------------
 with st.sidebar:
@@ -764,6 +822,136 @@ theme_css += """
             gap: 1.25rem !important;
         }
     }
+
+    /* ============================================================
+       NOTIFIKASI POP-UP BERANIMASI (SignaCerta Toast)
+       Implementasi CSS murni — tanpa JavaScript (Streamlit menyaring <script>)
+       ============================================================ */
+    @keyframes sc-toast-lifecycle {
+        0%   { opacity: 0; transform: translateY(-28px) scale(0.92); visibility: visible; }
+        7%   { opacity: 1; transform: translateY(0)     scale(1); }
+        88%  { opacity: 1; transform: translateY(0)     scale(1); }
+        100% { opacity: 0; transform: translateY(-18px) scale(0.96); visibility: hidden; }
+    }
+    @keyframes sc-toast-out {
+        0%   { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-20px) scale(0.95); visibility: hidden; }
+    }
+    @keyframes sc-toast-progress {
+        0%   { width: 100%; }
+        100% { width: 0%; }
+    }
+    @keyframes sc-toast-icon-pop {
+        0%   { transform: scale(0.3) rotate(-25deg); opacity: 0; }
+        55%  { transform: scale(1.18) rotate(6deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    @keyframes sc-toast-ring {
+        0%   { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.45); }
+        70%  { box-shadow: 0 0 0 12px rgba(5, 150, 105, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+    }
+
+    .sc-toast-wrap {
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+        max-width: min(92vw, 400px);
+    }
+    .sc-toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 16px 16px 16px;
+        border-radius: 12px;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-left: 5px solid #059669;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
+        animation: sc-toast-lifecycle var(--sc-toast-life, 5s) cubic-bezier(0.22, 1, 0.36, 1) both;
+        position: relative;
+        overflow: hidden;
+        font-family: var(--font-sans);
+    }
+    /* Tombol tutup (checkbox murni CSS, tanpa JavaScript) */
+    .sc-toast__closer { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+    .sc-toast__closer:checked + .sc-toast {
+        animation: sc-toast-out 0.34s cubic-bezier(0.4, 0, 1, 1) both;
+        pointer-events: none;
+    }
+    .sc-toast--success { border-left-color: #059669; }
+    .sc-toast--error   { border-left-color: #DC2626; }
+    .sc-toast--warning { border-left-color: #D97706; }
+    .sc-toast--info    { border-left-color: #0284C7; }
+
+    .sc-toast__icon {
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .sc-toast--success .sc-toast__icon { background: #D1FAE5; color: #047857; animation: sc-toast-icon-pop 0.5s cubic-bezier(0.22,1,0.36,1) 0.08s both, sc-toast-ring 1.1s ease-out 0.5s 1; }
+    .sc-toast--error   .sc-toast__icon { background: #FEE2E2; color: #B91C1C; animation: sc-toast-icon-pop 0.5s cubic-bezier(0.22,1,0.36,1) 0.08s both; }
+    .sc-toast--warning .sc-toast__icon { background: #FEF3C7; color: #B45309; animation: sc-toast-icon-pop 0.5s cubic-bezier(0.22,1,0.36,1) 0.08s both; }
+    .sc-toast--info    .sc-toast__icon { background: #E0F2FE; color: #0369A1; animation: sc-toast-icon-pop 0.5s cubic-bezier(0.22,1,0.36,1) 0.08s both; }
+
+    .sc-toast__body { flex: 1 1 auto; min-width: 0; }
+    .sc-toast__title {
+        font-size: 0.86rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin: 0 0 2px 0;
+        letter-spacing: 0.01em;
+    }
+    .sc-toast__msg {
+        font-size: 0.79rem;
+        line-height: 1.4;
+        color: #475569;
+        margin: 0;
+        word-break: break-word;
+    }
+    .sc-toast__close {
+        flex: 0 0 auto;
+        color: #94A3B8;
+        cursor: pointer;
+        font-size: 0.95rem;
+        line-height: 1;
+        padding: 2px 6px;
+        border-radius: 6px;
+        user-select: none;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .sc-toast__close:hover { background: #F1F5F9; color: #334155; }
+
+    .sc-toast__bar {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 3px;
+        width: 100%;
+        background: #059669;
+        animation: sc-toast-progress var(--sc-toast-life, 5s) linear both;
+    }
+    .sc-toast--error   .sc-toast__bar { background: #DC2626; }
+    .sc-toast--warning .sc-toast__bar { background: #D97706; }
+    .sc-toast--info    .sc-toast__bar { background: #0284C7; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .sc-toast, .sc-toast__icon, .sc-toast__bar { animation-duration: 0.01s !important; }
+    }
+
+    @media (max-width: 640px) {
+        .sc-toast-wrap { top: 10px; right: 10px; left: 10px; max-width: none; }
+    }
 </style>"""
 
 theme_badge_color = "#38BDF8" if dark_mode else "#0B3C5D"
@@ -803,7 +991,11 @@ if nav_choice == "1. Pembangkitan Kunci":
             btn_generate = st.button("Bangkitkan Pasangan Kunci Baru", type="primary", use_container_width=True)
             if btn_generate:
                 if not passphrase_input or len(passphrase_input) < 6:
-                    st.error("Passphrase wajib diisi minimal 6 karakter demi kekuatan enkripsi.")
+                    show_toast(
+                        "warning",
+                        "Passphrase Terlalu Pendek",
+                        "Passphrase wajib diisi minimal 6 karakter demi kekuatan enkripsi.",
+                    )
                 else:
                     with st.spinner("Menghasilkan titik generator acak pada kurva secp256r1..."):
                         priv, pub = generate_keypair()
@@ -813,7 +1005,12 @@ if nav_choice == "1. Pembangkitan Kunci":
                         st.session_state["gen_priv_pem"] = priv_pem
                         st.session_state["gen_pub_pem"] = pub_pem
                         st.session_state["saved_passphrase"] = passphrase_input
-                        st.success("Pasangan kunci ECDSA NIST P-256 berhasil dibangkitkan dan diamankan.")
+                        show_toast(
+                            "success",
+                            "Kunci Berhasil Dibangkitkan",
+                            "Pasangan kunci ECDSA NIST P-256 berhasil dibuat dan diamankan dengan passphrase.",
+                            duration=5.0,
+                        )
 
     with col_k2:
         with st.container(border=True):
@@ -860,9 +1057,10 @@ if nav_choice == "1. Pembangkitan Kunci":
 # TAB 2: PENANDATANGANAN DOKUMEN (SIGNING)
 # ==============================================================================
 elif nav_choice == "2. Penandatanganan Dokumen":
-    st.subheader("Penandatanganan Dokumen PDF & Pembubuhan Lencana QR-Code")
+    st.subheader("Penandatanganan Dokumen & Pembubuhan Lencana QR-Code")
     st.write(
-        "Unggah dokumen PDF asli, tentukan identitas resmi penandatangan, lalu pilih letak penempelan lencana QR-Code. "
+        "Unggah dokumen yang ingin ditandatangani (PDF atau berkas gambar), "
+        "tentukan identitas resmi penandatangan, lalu bubuhkan tanda tangan digital. "
         "Sistem mendukung fitur penandatanganan berjenjang (*Multiple Signers*) tanpa merusak tanda tangan terdahulu."
     )
     
@@ -870,7 +1068,16 @@ elif nav_choice == "2. Penandatanganan Dokumen":
     with col_s1:
         with st.container(border=True):
             st.markdown("##### 1. Formulir Berkas & Identitas Penandatangan")
-            pdf_file = st.file_uploader("Pilih Berkas PDF yang Akan Ditandatangani:", type=["pdf"], key="pdf_sign_upload")
+            pdf_file = st.file_uploader(
+                "Pilih Berkas yang Akan Ditandatangani (PDF atau Gambar):",
+                type=["pdf", "png", "jpg", "jpeg", "webp", "gif", "bmp"],
+                key="pdf_sign_upload",
+            )
+            
+            # Deteksi tipe berkas: PDF (lencana visual) atau gambar (blok tersemat)
+            is_pdf_file = False
+            if pdf_file:
+                is_pdf_file = pdf_file.name.lower().endswith(".pdf")
             
             # Tampilkan info berkas instan jika diunggah
             existing_signers_count = 0
@@ -878,14 +1085,23 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             if pdf_file:
                 try:
                     pdf_bytes_tmp = pdf_file.getvalue()
-                    reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
-                    st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
-                    if SIG_MARKER_START in pdf_bytes_tmp and SIG_MARKER_END in pdf_bytes_tmp:
-                        parts = pdf_bytes_tmp.split(SIG_MARKER_START)
-                        sub = parts[1].split(SIG_MARKER_END)[0]
-                        prev_meta = json.loads(sub.decode("utf-8"))
-                        existing_signers_count = prev_meta.get("total_signers", len(prev_meta.get("signatures", [])))
-                        st.info(f"Dokumen ini telah memiliki {existing_signers_count} tanda tangan sebelumnya. Sistem otomatis mengaktifkan mode tanda tangan berjenjang (Multiple Signers).")
+                    if is_pdf_file:
+                        reader_tmp = PdfReader(io.BytesIO(pdf_bytes_tmp))
+                        st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • **{len(reader_tmp.pages)} Halaman**")
+                        if SIG_MARKER_START in pdf_bytes_tmp and SIG_MARKER_END in pdf_bytes_tmp:
+                            parts = pdf_bytes_tmp.split(SIG_MARKER_START)
+                            sub = parts[1].split(SIG_MARKER_END)[0]
+                            prev_meta = json.loads(sub.decode("utf-8"))
+                            existing_signers_count = prev_meta.get("total_signers", len(prev_meta.get("signatures", [])))
+                            st.info(f"Dokumen ini telah memiliki {existing_signers_count} tanda tangan sebelumnya. Sistem otomatis mengaktifkan mode tanda tangan berjenjang (Multiple Signers).")
+                    else:
+                        st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • Berkas Gambar")
+                        st.info(
+                            "Berkas gambar ditandatangani dengan skema *Embedded Signature*: blok "
+                            "integritas kriptografis (hash + tanda tangan ECDSA) disematkan langsung ke "
+                            "dalam berkas, sehingga **satu berkas** sudah memuat tanda tangannya dan "
+                            "gambar tetap tampil normal."
+                        )
                 except Exception:
                     pass
 
@@ -911,23 +1127,28 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 elif existing_signers_count >= 2:
                     default_pos_idx = 2
                 
-                if pdf_file and pdf_bytes_tmp is not None:
+                if pdf_file and pdf_bytes_tmp is not None and is_pdf_file:
                     file_sig_key = f"{pdf_file.name}_{len(pdf_bytes_tmp)}"
                     if st.session_state.get("last_uploaded_file_key") != file_sig_key:
                         st.session_state["last_uploaded_file_key"] = file_sig_key
                         st.session_state["pos_in"] = pos_options[default_pos_idx]
-                    
-                stamp_pos = st.selectbox(
-                    "Posisi Lencana Tanda Tangan QR:",
-                    pos_options,
-                    index=default_pos_idx,
-                    key="pos_in",
-                    help="Sistem otomatis memilih posisi yang kosong agar tidak menimpa tanda tangan pihak terdahulu.",
-                )
-                if existing_signers_count == 1 and stamp_pos == "bottom-right":
-                    st.caption("⚠️ Catatan: Posisi *bottom-right* kemungkinan telah ditempati penandatangan pertama. Disarankan memilih *bottom-left*.")
-                elif existing_signers_count >= 2 and stamp_pos in ["bottom-right", "bottom-left"]:
-                    st.caption("⚠️ Catatan: Posisi ini kemungkinan telah terisi. Disarankan memilih *bottom-center*.")
+                
+                # Pemilih posisi lencana hanya relevan untuk berkas PDF
+                if is_pdf_file or not pdf_file:
+                    stamp_pos = st.selectbox(
+                        "Posisi Lencana Tanda Tangan QR:",
+                        pos_options,
+                        index=default_pos_idx,
+                        key="pos_in",
+                        help="Sistem otomatis memilih posisi yang kosong agar tidak menimpa tanda tangan pihak terdahulu.",
+                    )
+                    if existing_signers_count == 1 and stamp_pos == "bottom-right":
+                        st.caption("⚠️ Catatan: Posisi *bottom-right* kemungkinan telah ditempati penandatangan pertama. Disarankan memilih *bottom-left*.")
+                    elif existing_signers_count >= 2 and stamp_pos in ["bottom-right", "bottom-left"]:
+                        st.caption("⚠️ Catatan: Posisi ini kemungkinan telah terisi. Disarankan memilih *bottom-center*.")
+                else:
+                    # Berkas gambar: tidak memakai lencana visual
+                    stamp_pos = "bottom-right"
 
             st.markdown("---")
             st.markdown("###### Otorisasi Kunci Privat Penandatangan")
@@ -947,46 +1168,77 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             btn_execute_sign = st.button("Tandatangani Dokumen Sekarang", type="primary", use_container_width=True)
             if btn_execute_sign:
                 if not pdf_file:
-                    st.error("Silakan unggah dokumen PDF asli terlebih dahulu.")
+                    show_toast("warning", "Berkas Belum Diunggah", "Silakan unggah berkas yang akan ditandatangani terlebih dahulu.")
                 elif not signer_name or not signer_id:
-                    st.error("Nama lengkap dan identitas pengenal (NPM/NIP) wajib diisi.")
+                    show_toast("warning", "Identitas Belum Lengkap", "Nama lengkap dan identitas pengenal (NPM/NIP) wajib diisi.")
                 elif not priv_bytes_input or not signer_pass:
-                    st.error("Berkas Private Key dan Passphrase wajib disertakan untuk otorisasi tanda tangan.")
+                    show_toast("warning", "Otorisasi Belum Lengkap", "Berkas Private Key dan Passphrase wajib disertakan untuk otorisasi tanda tangan.")
                 else:
                     try:
-                        with st.spinner("Menghitung digest SHA-256 dan membubuhkan stempel kriptografis..."):
+                        with st.spinner("Menghitung digest SHA-256 dan membubuhkan tanda tangan kriptografis..."):
                             private_key = load_private_key_pem(priv_bytes_input, passphrase=signer_pass)
                             public_key_pem = export_public_key_pem(private_key.public_key())
-                            
-                            pdf_bytes = pdf_file.getvalue()
-                            signed_bytes, meta = sign_and_stamp_pdf(
-                                input_pdf_bytes=pdf_bytes,
-                                private_key=private_key,
-                                public_key_pem=public_key_pem,
-                                signer_name=signer_name,
-                                signer_id=signer_id,
-                                institution=institution or "Universitas Siliwangi",
-                                position=stamp_pos,
-                            )
-                            st.session_state["signed_pdf_result"] = signed_bytes
-                            st.session_state["signed_meta"] = meta
-                            st.success("Dokumen PDF berhasil ditandatangani dan dicap dengan lencana QR-Code.")
+
+                            file_bytes = pdf_file.getvalue()
+
+                            if is_pdf_file:
+                                # Jalur PDF: lencana visual QR-Code + blok integritas di akhir berkas
+                                signed_bytes, meta = sign_and_stamp_pdf(
+                                    input_pdf_bytes=file_bytes,
+                                    private_key=private_key,
+                                    public_key_pem=public_key_pem,
+                                    signer_name=signer_name,
+                                    signer_id=signer_id,
+                                    institution=institution or "Universitas Siliwangi",
+                                    position=stamp_pos,
+                                )
+                                st.session_state["signed_pdf_result"] = signed_bytes
+                                st.session_state["signed_meta"] = meta
+                                st.session_state["signed_output_name"] = f"signed_{pdf_file.name}"
+                                st.session_state["signed_output_mime"] = "application/pdf"
+                                st.session_state["signed_mode"] = "pdf"
+                                st.session_state.pop("signed_detached_payload", None)
+                                st.session_state.pop("signed_generic_result", None)
+                                st.session_state.pop("signed_generic_meta", None)
+                                show_toast("success", "PDF Berhasil Ditandatangani", "Dokumen PDF berhasil ditandatangani dan dicap dengan lencana QR-Code.")
+                            else:
+                                # Jalur gambar: blok integritas disematkan langsung ke dalam berkas
+                                signed_bytes, sig_payload = sign_generic_file(
+                                    file_bytes=file_bytes,
+                                    original_filename=pdf_file.name,
+                                    private_key=private_key,
+                                    public_key_pem=public_key_pem,
+                                    signer_name=signer_name,
+                                    signer_id=signer_id,
+                                    institution=institution or "Universitas Siliwangi",
+                                )
+                                st.session_state["signed_generic_result"] = signed_bytes
+                                st.session_state["signed_generic_meta"] = sig_payload
+                                st.session_state["signed_output_name"] = f"signed_{pdf_file.name}"
+                                st.session_state["signed_output_mime"] = "application/octet-stream"
+                                st.session_state["signed_mode"] = "generic"
+                                st.session_state["signed_original_name"] = pdf_file.name
+                                st.session_state.pop("signed_pdf_result", None)
+                                st.session_state.pop("signed_meta", None)
+                                show_toast("success", "Berkas Berhasil Ditandatangani", "Blok integritas kriptografis telah disematkan ke dalam berkas gambar.")
                     except ValueError:
-                        st.error("Passphrase tidak sesuai! Kunci privat gagal didekripsi.")
+                        show_toast("error", "Passphrase Salah", "Passphrase tidak sesuai! Kunci privat gagal didekripsi.")
                     except Exception as e:
-                        st.error(f"Terjadi kegagalan penandatanganan: {e}")
+                        show_toast("error", "Penandatanganan Gagal", f"Terjadi kegagalan penandatanganan: {e}")
 
     with col_s2:
         with st.container(border=True):
-            st.markdown("##### 2. Dokumen Hasil Penandatanganan")
-            if "signed_pdf_result" in st.session_state:
+            st.markdown("##### 2. Berkas Hasil Penandatanganan")
+            signed_mode = st.session_state.get("signed_mode", "")
+
+            if signed_mode == "pdf" and "signed_pdf_result" in st.session_state:
                 meta = st.session_state["signed_meta"]
                 latest_sig = meta["signatures"][-1]
                 
                 st.download_button(
                     label="Unduh PDF Bertanda Tangan Resmi (.pdf)",
                     data=st.session_state["signed_pdf_result"],
-                    file_name=f"signed_{pdf_file.name if pdf_file else 'document'}.pdf",
+                    file_name=st.session_state.get("signed_output_name", "signed_document.pdf"),
                     mime="application/pdf",
                     type="primary",
                     use_container_width=True,
@@ -1008,7 +1260,48 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 
                 st.caption("Tanda Tangan Digital ECDSA (Base64):")
                 st.markdown(f'<div class="hash-badge">{latest_sig["signature"][:40]}... (Panjang: {len(latest_sig["signature"])} Karakter)</div>', unsafe_allow_html=True)
+
+            elif signed_mode == "generic" and "signed_generic_result" in st.session_state:
+                payload = st.session_state["signed_generic_meta"]
+                latest_sig = payload["signatures"][-1]
+                original_name = st.session_state.get("signed_original_name", payload.get("original_filename", "berkas"))
                 
+                st.info(
+                    "Berkas sudah ditandatangani dalam **satu berkas**. Blok integritas kriptografis "
+                    "disematkan di akhir berkas; berkas tetap dapat dibuka normal oleh aplikasi aslinya "
+                    "(Word, Excel, penampil gambar, dsb.)."
+                )
+                st.download_button(
+                    label=f"Unduh Berkas Bertanda Tangan ({original_name})",
+                    data=st.session_state["signed_generic_result"],
+                    file_name=st.session_state.get("signed_output_name", f"signed_{original_name}"),
+                    mime="application/octet-stream",
+                    type="primary",
+                    use_container_width=True,
+                )
+                
+                st.markdown("**Metadata Penandatangan Terdaftar:**")
+                st.write(f"• **Berkas Ditandatangani:** {original_name}")
+                st.write(f"• **Penandatangan Terakhir:** {latest_sig.get('signer', '-')} ({latest_sig.get('id', '-')})")
+                st.write(f"• **Institusi:** {latest_sig.get('institution', '-')}")
+                st.write(f"• **Waktu:** {latest_sig.get('date', '-')}")
+                st.write(f"• **Total Penandatangan:** {payload.get('total_signers', 1)} pihak")
+                
+                if payload.get("total_signers", 1) > 1:
+                    st.caption("Daftar seluruh penandatangan terdaftar pada berkas ini:")
+                    for idx, s in enumerate(payload.get("signatures", []), 1):
+                        st.write(f"  {idx}. **{s.get('signer', '-')}** ({s.get('id', '-')}) — *{s.get('institution', '-')}*")
+                
+                st.caption("Digest SHA-256 Konten Berkas:")
+                st.markdown(f'<div class="hash-badge">{payload["base_doc_hash"]}</div>', unsafe_allow_html=True)
+                
+                st.caption("Tanda Tangan Digital ECDSA (Base64):")
+                st.markdown(f'<div class="hash-badge">{latest_sig["signature"][:40]}... (Panjang: {len(latest_sig["signature"])} Karakter)</div>', unsafe_allow_html=True)
+
+            else:
+                st.caption("Berkas bertanda tangan dan ringkasan metadata kriptografis akan ditampilkan di sini.")
+
+            if signed_mode in ("pdf", "generic"):
                 st.markdown("---")
                 col_btn_prev, col_btn_next = st.columns(2)
                 with col_btn_prev:
@@ -1026,8 +1319,6 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                         on_click=navigate_to,
                         args=("3. Verifikasi Integritas",),
                     )
-            else:
-                st.caption("Dokumen PDF bertanda tangan dan ringkasan metadata kriptografis akan ditampilkan di sini.")
 
 # ==============================================================================
 # TAB 3: VERIFIKASI INTEGRITAS DOKUMEN (VERIFICATION)
@@ -1035,8 +1326,9 @@ elif nav_choice == "2. Penandatanganan Dokumen":
 elif nav_choice == "3. Verifikasi Integritas":
     st.subheader("Verifikasi Keaslian & Uji Integritas Dokumen")
     st.write(
-        "Unggah dokumen PDF untuk menguji keabsahan tanda tangan digital serta memastikan "
-        "tidak terdapat manipulasi isi dokumen (bahkan perubahan sebesar 1 byte)."
+        "Unggah berkas untuk menguji keabsahan tanda tangan digital serta memastikan "
+        "tidak terdapat manipulasi isi (bahkan perubahan sebesar 1 byte). Mendukung berkas "
+        "PDF maupun berkas gambar (PNG, JPG, WEBP) — cukup satu berkas saja."
     )
     
     col_v1, col_v2 = st.columns([1.1, 1.2], gap="large")
@@ -1045,7 +1337,8 @@ elif nav_choice == "3. Verifikasi Integritas":
             st.markdown("##### 1. Berkas Pengujian")
             
             use_recent_signed = False
-            if "signed_pdf_result" in st.session_state:
+            recent_mode = st.session_state.get("signed_mode", "")
+            if recent_mode == "pdf" and "signed_pdf_result" in st.session_state:
                 use_recent_signed = st.checkbox(
                     "Gunakan berkas PDF hasil penandatanganan dari Tahap 2",
                     value=True,
@@ -1053,11 +1346,22 @@ elif nav_choice == "3. Verifikasi Integritas":
                 )
                 if use_recent_signed:
                     st.info("Berkas aktif: Dokumen PDF resmi dari Tahap 2 siap diverifikasi.")
+            elif recent_mode == "generic" and "signed_generic_result" in st.session_state:
+                use_recent_signed = st.checkbox(
+                    "Gunakan berkas hasil penandatanganan dari Tahap 2",
+                    value=True,
+                    help="Praktis untuk pengujian langsung berkas gambar yang baru ditandatangani.",
+                )
+                if use_recent_signed:
+                    st.info("Berkas aktif: Berkas gambar bertanda tangan dari Tahap 2 siap diverifikasi.")
             
+            verify_file = None
             if not use_recent_signed:
-                verify_file = st.file_uploader("Pilih Berkas PDF Bertanda Tangan:", type=["pdf"], key="pdf_verify_upload")
-            else:
-                verify_file = None
+                verify_file = st.file_uploader(
+                    "Pilih Berkas yang Ingin Diverifikasi (PDF atau Gambar):",
+                    type=["pdf", "png", "jpg", "jpeg", "webp", "gif", "bmp"],
+                    key="pdf_verify_upload",
+                )
             
             with st.expander("Uji Kunci Publik Tertentu (Demonstrasi Penolakan Kunci Palsu)"):
                 st.caption("Gunakan opsi ini saat demonstrasi untuk membuktikan bahwa sistem menolak verifikasi jika menggunakan Public Key milik pihak lain.")
@@ -1065,19 +1369,67 @@ elif nav_choice == "3. Verifikasi Integritas":
 
             btn_verify_act = st.button("Jalankan Verifikasi Integritas", type="primary", use_container_width=True)
             if btn_verify_act:
-                pdf_data = None
-                if use_recent_signed and "signed_pdf_result" in st.session_state:
-                    pdf_data = st.session_state["signed_pdf_result"]
+                file_data = None
+                target_is_pdf = True
+
+                if use_recent_signed:
+                    if recent_mode == "pdf" and "signed_pdf_result" in st.session_state:
+                        file_data = st.session_state["signed_pdf_result"]
+                        target_is_pdf = True
+                    elif recent_mode == "generic" and "signed_generic_result" in st.session_state:
+                        file_data = st.session_state["signed_generic_result"]
+                        target_is_pdf = False
                 elif verify_file:
-                    pdf_data = verify_file.getvalue()
+                    file_data = verify_file.getvalue()
+                    target_is_pdf = verify_file.name.lower().endswith(".pdf")
                     
-                if not pdf_data:
-                    st.error("Silakan pilih berkas PDF yang ingin diverifikasi.")
+                if not file_data:
+                    show_toast("warning", "Berkas Belum Dipilih", "Silakan pilih berkas yang ingin diverifikasi.")
                 else:
-                    with st.spinner("Memvalidasi blok integritas kriptografis dan mencocokkan digest SHA-256..."):
+                    with st.spinner("Memvalidasi integritas kriptografis dan mencocokkan digest SHA-256..."):
                         custom_pub_data = custom_pub_upload.getvalue() if custom_pub_upload else None
-                        audit_res = verify_pdf_document(pdf_data, custom_public_key_pem=custom_pub_data)
+                        if target_is_pdf:
+                            audit_res = verify_pdf_document(file_data, custom_public_key_pem=custom_pub_data)
+                        else:
+                            audit_res = verify_generic_file(file_data, custom_public_key_pem=custom_pub_data)
                         st.session_state["verify_result"] = audit_res
+                        # Notifikasi pop-up sesuai hasil audit
+                        _status = audit_res.get("status", "")
+                        if _status == "VALID":
+                            show_toast(
+                                "success",
+                                "Verifikasi Berhasil — Berkas VALID",
+                                "Berkas terbukti otentik, utuh, dan seluruh tanda tangan digital sah.",
+                                duration=6.0,
+                            )
+                        elif _status == "TAMPERED":
+                            show_toast(
+                                "error",
+                                "Verifikasi Gagal — Berkas TAMPERED",
+                                "Integritas berkas rusak. Berkas telah dimanipulasi setelah ditandatangani.",
+                                duration=7.0,
+                            )
+                        elif _status == "KEY_MISMATCH":
+                            show_toast(
+                                "error",
+                                "Verifikasi Gagal — Kunci Tidak Cocok",
+                                "Tanda tangan digital tidak cocok dengan Kunci Publik yang diberikan.",
+                                duration=7.0,
+                            )
+                        elif _status == "UNSIGNED":
+                            show_toast(
+                                "warning",
+                                "Berkas Belum Ditandatangani",
+                                "Berkas tidak memiliki blok tanda tangan digital resmi.",
+                                duration=6.0,
+                            )
+                        else:
+                            show_toast(
+                                "warning",
+                                "Verifikasi Tidak Dapat Diselesaikan",
+                                audit_res.get("message", "Metadata tanda tangan rusak atau tidak dapat dibaca."),
+                                duration=6.0,
+                            )
 
     with col_v2:
         with st.container(border=True):
@@ -1105,18 +1457,26 @@ elif nav_choice == "3. Verifikasi Integritas":
                 elif res["status"] == "TAMPERED":
                     st.markdown(f"""
                     <div class="cert-audit-tampered">
-                        <div class="cert-audit-title-tampered">PERINGATAN: INTEGRITAS RUSAK / DOKUMEN DIMANIPULASI</div>
+                        <div class="cert-audit-title-tampered">PERINGATAN: INTEGRITAS RUSAK / BERKAS DIMANIPULASI</div>
                         <div style="color: #991B1B; font-size: 0.95rem;">
-                            {res["message"]} Nilai hash isi berkas yang dibaca berbeda dengan hash saat proses penandatanganan awal.
+                            {res["message"]}
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    st.caption("Nilai Hash SHA-256 Berkas Saat Ini (Hasil Manipulasi):")
-                    st.markdown(f'<div class="hash-badge">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
-                    
-                    st.caption("Nilai Hash Asli yang Ditandatangani:")
-                    st.markdown(f'<div class="hash-badge">{res.get("expected_hash")}</div>', unsafe_allow_html=True)
+
+                    if res.get("marker_info"):
+                        st.markdown("**Jejak Penandatangan Terdeteksi pada Metadata Berkas:**")
+                        mk = res["marker_info"]
+                        st.write(f"• **Penandatangan:** {mk.get('signer', '-')}")
+                        st.write(f"• **Identitas:** {mk.get('id', '-')}")
+                        st.write(f"• **Tanggal Tanda Tangan:** {mk.get('date', '-')}")
+
+                    if res.get("computed_hash"):
+                        st.caption("Nilai Hash SHA-256 Berkas Saat Ini (Hasil Manipulasi):")
+                        st.markdown(f'<div class="hash-badge">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
+
+                        st.caption("Nilai Hash Asli yang Ditandatangani:")
+                        st.markdown(f'<div class="hash-badge">{res.get("expected_hash")}</div>', unsafe_allow_html=True)
 
                 elif res["status"] == "KEY_MISMATCH":
                     st.markdown(f"""
@@ -1128,7 +1488,14 @@ elif nav_choice == "3. Verifikasi Integritas":
                     </div>
                     """, unsafe_allow_html=True)
                 else:
+                    # Status UNSIGNED / CORRUPTED_METADATA: tampilkan pesan penjelas.
                     st.warning(res["message"])
+                    if res["status"] == "UNSIGNED":
+                        st.caption(
+                            "Catatan: Berkas yang belum pernah ditandatangani memang tidak memiliki "
+                            "blok tanda tangan. Untuk mengujinya, tanda tangani dulu berkas pada Tahap 2, "
+                            "lalu verifikasi kembali di sini."
+                        )
                 
                 st.markdown("---")
                 col_v_prev, col_v_next = st.columns(2)
@@ -1172,9 +1539,14 @@ elif nav_choice == "4. Uji Kuantitatif & Benchmark":
                 from benchmark import run_benchmark
                 res = run_benchmark(iterations=30)
                 st.session_state["benchmark_result"] = res
-                st.success("Seluruh 30 iterasi pengujian dan 10 skenario uji tamper berhasil diselesaikan.")
+                show_toast(
+                    "success",
+                    "Benchmark Selesai",
+                    "Seluruh 30 iterasi pengujian dan 10 skenario uji tamper berhasil diselesaikan.",
+                    duration=6.0,
+                )
             except Exception as e:
-                st.error(f"Gagal menjalankan benchmark: {e}")
+                show_toast("error", "Benchmark Gagal", f"Gagal menjalankan benchmark: {e}")
 
     res = st.session_state.get("benchmark_result")
     
@@ -1192,7 +1564,12 @@ elif nav_choice == "4. Uji Kuantitatif & Benchmark":
         df_bench = pd.DataFrame(res["benchmark_data"])
         st.markdown("##### Distribusi Waktu Komputasi Tiap Iterasi (ms)")
         st.line_chart(
-            df_bench.set_index("iterasi")[["waktu_signing_ms", "waktu_verifikasi_ms"]],
+            df_bench.set_index("iteration")[["sign_time_ms", "verify_time_ms"]].rename(
+                columns={
+                    "sign_time_ms": "Waktu Signing (ms)",
+                    "verify_time_ms": "Waktu Verifikasi (ms)",
+                }
+            ),
             color=["#0B3C5D", "#059669"]
         )
         
@@ -1353,3 +1730,7 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# ----------------- NOTIFIKASI POP-UP (dirender di AKHIR agar toast dari aksi
+# tombol pada rerun yang sama langsung muncul, tanpa perlu rerun tambahan) -----------------
+render_toasts()

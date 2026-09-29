@@ -14,16 +14,20 @@
 ---
 
 ## 📌 Deskripsi Proyek
-Proyek ini mengimplementasikan skema **Tanda Tangan Digital (Digital Signature)** pada dokumen PDF untuk menjamin:
+Proyek ini mengimplementasikan skema **Tanda Tangan Digital (Digital Signature)** pada dokumen untuk menjamin:
 1. **Keaslian (Authenticity):** Memastikan dokumen ditandatangani oleh entitas yang sah.
 2. **Keutuhan (Integrity):** Mendeteksi perubahan bahkan 1 byte/karakter setelah dokumen ditandatangani.
 3. **Nir-penyangkalan (Non-repudiation):** Penandatangan tidak dapat menyangkal berkas yang telah dibubuhi tanda tangannya.
+
+Aplikasi mendukung **dua jalur penandatanganan**:
+* **Berkas PDF** — tanda tangan tertanam di dalam berkas: lencana visual QR-Code + blok integritas kriptografis.
+* **Berkas Gambar** (PNG, JPG/JPEG, WEBP, GIF, BMP) — skema **Embedded Signature**: blok integritas kriptografis disematkan langsung ke dalam berkas, sehingga cukup satu berkas saja dan gambar tetap tampil normal.
 
 ### Spesifikasi Teknis
 * **Algoritma Asimetris:** ECDSA (*Elliptic Curve Digital Signature Algorithm*) dengan kurva **NIST P-256 (secp256r1)**.
 * **Fungsi Hash:** **SHA-256** (*Secure Hash Algorithm 256-bit*).
 * **Proteksi Kunci Privat:** Enkripsi *Private Key* menggunakan **AES-256-GCM** berbasis kata sandi (*passphrase*).
-* **Penanda Visual Dokumen:** **QR-Code** memuat metadata penandatanganan dan tanda tangan digital terenkode Base64.
+* **Penanda Visual Dokumen:** **QR-Code** memuat metadata penandatanganan dan tanda tangan digital terenkode Base64 (khusus berkas PDF).
 
 ---
 
@@ -34,10 +38,12 @@ Proyek ini mengimplementasikan skema **Tanda Tangan Digital (Digital Signature)*
 ├── requirements.txt
 ├── crypto_engine.py       # Modul inti kriptografi (Keygen, Hash, Sign, Enkripsi Kunci)
 ├── pdf_stamper.py         # Modul integrasi PDF & overlay QR-Code
+├── generic_signer.py      # Modul penandatanganan berkas gambar (Embedded Signature)
 ├── verifier.py            # Modul verifikasi dokumen & validasi tanda tangan
 ├── benchmark.py           # Script pengujian kuantitatif & ekspor Excel (.xlsx)
 └── tests/                 # Unit test otomatis (minimal 5 skenario uji wajib)
-    └── test_crypto.py     # Pengujian modul kriptografi
+    ├── test_crypto.py     # Pengujian modul kriptografi
+    └── test_generic.py    # Pengujian modul penandatanganan berkas gambar
 ```
 
 ---
