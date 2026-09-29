@@ -47,6 +47,57 @@ def create_qr_code_image(data_text: str, box_size: int = 4, border: int = 1) -> 
     return buf.getvalue()
 
 
+def _compute_badge_position(
+    page_width: float,
+    page_height: float,
+    position: str,
+    badge_width: float,
+    badge_height: float,
+    slot_index: int = 0,
+) -> Tuple[float, float]:
+    """Menghitung koordinat lencana dengan tata letak anti-tumpuk (anti-collision).
+
+    Strategi: lencana disusun berjenjang dari bawah ke atas pada sisi kanan
+    halaman (dan bergeser ke kiri bila sudah penuh), sehingga lencana dari
+    beberapa penandatangan tidak saling menimpa.
+
+    Args:
+        slot_index: urutan penandatangan (0 = pertama, 1 = kedua, dst.).
+
+    Returns:
+        Tuple (x, y) dalam satuan poin PDF.
+    """
+    margin_x = 35.0
+    margin_y = 35.0
+    gap_y = 10.0  # jarak vertikal antar lencana
+    gap_x = 12.0  # jarak horizontal antar kolom lencana
+
+    # Berapa lencana yang muat menumpuk ke atas pada satu kolom?
+    usable_h = page_height - (2 * margin_y)
+    per_column = max(1, int((usable_h + gap_y) // (badge_height + gap_y)))
+    per_column = min(per_column, 4)  # batasi agar tetap rapi
+
+    column = slot_index // per_column          # kolom ke-berapa (dari kanan)
+    row = slot_index % per_column              # posisi ke-berapa dalam kolom
+
+    # Titik awal kolom: dari kanan ke kiri
+    base_right_x = page_width - badge_width - margin_x
+    x = base_right_x - column * (badge_width + gap_x)
+
+    # Bila kolom sudah melewati batas kiri halaman, pindahkan ke tengah/kiri
+    min_x = margin_x
+    if x < min_x:
+        # Bungkus: mulai kolom baru dari kiri
+        columns_fit = max(1, int((page_width - 2 * margin_x + gap_x) // (badge_width + gap_x)))
+        col_from_left = (column - columns_fit) % max(1, columns_fit)
+        x = min_x + col_from_left * (badge_width + gap_x)
+
+    # Posisi vertikal: menumpuk dari bawah ke atas
+    y = margin_y + row * (badge_height + gap_y)
+
+    return x, y
+
+
 def create_signature_badge_pdf(
     page_width: float,
     page_height: float,
@@ -56,25 +107,30 @@ def create_signature_badge_pdf(
     date_str: str,
     qr_png_bytes: bytes,
     position: str = "bottom-right",
-    badge_width: float = 230.0,
-    badge_height: float = 85.0,
+    badge_width: float = 205.0,
+    badge_height: float = 76.0,
+    slot_index: int = 0,
 ) -> bytes:
     """Membuat dokumen PDF satu halaman transparan berisi badge tanda tangan digital."""
-    margin_x = 35.0
-    margin_y = 35.0
-
-    if position == "bottom-left":
-        x = margin_x
-        y = margin_y
-    elif position == "bottom-center":
-        x = (page_width - badge_width) / 2.0
-        y = margin_y
-    else:  # default bottom-right
-        x = page_width - badge_width - margin_x
-        y = margin_y
+    x, y = _compute_badge_position(
+        page_width, page_height, position, badge_width, badge_height, slot_index
+    )
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(page_width, page_height))
+
+    # 0. Sentinel marker sebagai teks mikro di sudut halaman.
+    #    Ditulis ke dalam CONTENT STREAM halaman (bukan metadata), sehingga tetap
+    #    bertahan walaupun dokumen ditulis ulang / dikompres oleh aplikasi lain.
+    #    Ukuran sangat kecil (0.4pt) dan hampir transparan agar tidak mengganggu tampilan.
+    try:
+        c.saveState()
+        c.setFillColor(HexColor("#F8FAFC"))  # nyaris sama dengan warna kertas
+        c.setFont("Helvetica", 0.4)
+        c.drawString(2.0, 2.0, f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}")
+        c.restoreState()
+    except Exception:
+        pass
 
     # 1. Kotak Luar Lencana (Background & Border)
     c.setStrokeColor(HexColor("#0B3C5D"))
@@ -111,10 +167,11 @@ def create_signature_badge_pdf(
     c.setFont("Helvetica-Bold", 6.8)
     c.drawString(text_x, y + 14.0, f"Terverifikasi: {date_str}")
 
-    # 5. Penempelan Gambar QR-Code di sisi kanan badge
-    qr_size = 62.0
-    qr_x = x + badge_width - qr_size - 8.0
-    qr_y = y + 5.0
+    # 5. Penempelan Gambar QR-Code di sisi kanan badge.
+    #    Ukuran & posisi diatur agar TIDAK menutupi header bar di bagian atas.
+    qr_size = 50.0
+    qr_x = x + badge_width - qr_size - 7.0
+    qr_y = y + 6.0
     qr_reader = ImageReader(io.BytesIO(qr_png_bytes))
     c.drawImage(qr_reader, qr_x, qr_y, width=qr_size, height=qr_size)
 
@@ -187,7 +244,10 @@ def sign_and_stamp_pdf(
 
     qr_bytes = create_qr_code_image(qr_payload)
 
-    # 4. Buat badge overlay dan gabungkan ke halaman terakhir
+    # 4. Buat badge overlay dan gabungkan ke halaman terakhir.
+    #    slot_index otomatis = jumlah penandatangan sebelumnya, sehingga lencana
+    #    tersusun berjenjang dan TIDAK saling menumpuk (anti-collision).
+    slot_index = len(existing_signatures)
     badge_pdf_bytes = create_signature_badge_pdf(
         page_width=page_w,
         page_height=page_h,
@@ -197,6 +257,7 @@ def sign_and_stamp_pdf(
         date_str=date_str,
         qr_png_bytes=qr_bytes,
         position=position,
+        slot_index=slot_index,
     )
     overlay_reader = PdfReader(io.BytesIO(badge_pdf_bytes))
     last_page.merge_page(overlay_reader.pages[0])
@@ -205,6 +266,19 @@ def sign_and_stamp_pdf(
     writer = PdfWriter()
     for page in reader_base.pages:
         writer.add_page(page)
+
+    # 5b. Sentel marker pada metadata PDF: jejak non-kriptografis agar berkas yang
+    #     pernah ditandatangani lalu ditulis ulang (mis. dikompres) masih dapat
+    #     dikenali sebagai "pernah ditandatangani" saat blok integritasnya hilang.
+    try:
+        marker_text = f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}"
+        writer.add_metadata({
+            "/Producer": "SignaCerta v2.0 (UNSIL)",
+            "/Creator": "SignaCerta Digital Signature",
+            "/SignaCertaMarker": marker_text,
+        })
+    except Exception:
+        pass
 
     stamped_buf = io.BytesIO()
     writer.write(stamped_buf)
