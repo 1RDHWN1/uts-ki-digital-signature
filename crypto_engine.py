@@ -58,6 +58,40 @@ def load_public_key_pem(pem_bytes: bytes) -> ec.EllipticCurvePublicKey:
     return cast(ec.EllipticCurvePublicKey, key)
 
 
+def export_public_key_compressed_b64(public_key: ec.EllipticCurvePublicKey) -> str:
+    """Mengekspor Public Key ke titik terkompresi (X9.62) lalu Base64-URL.
+
+    Titik terkompresi P-256 hanya 33 byte (44 karakter Base64), jauh lebih ringkas
+    daripada PEM (178 karakter), sehingga efisien untuk disematkan di dalam QR-Code.
+    """
+    point = public_key.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.CompressedPoint,
+    )
+    return base64.urlsafe_b64encode(point).decode("utf-8").rstrip("=")
+
+
+def load_public_key_compressed_b64(b64_str: str) -> ec.EllipticCurvePublicKey:
+    """Memuat kembali Public Key dari titik terkompresi Base64-URL."""
+    padded = b64_str + "=" * ((-len(b64_str)) % 4)
+    point = base64.urlsafe_b64decode(padded.encode("utf-8"))
+    return ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), point)
+
+
+def public_key_fingerprint(public_key: ec.EllipticCurvePublicKey) -> str:
+    """Menghitung fingerprint SHA-256 dari Public Key (format heksadesimal bergrup).
+
+    Fingerprint ini adalah identitas ringkas kunci publik yang dapat dicocokkan
+    secara manual terhadap daftar kunci resmi (trust anchor).
+    """
+    der = public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i:i + 4] for i in range(0, 32, 4))
+
+
 def hash_bytes(data: bytes) -> str:
     """Menghitung nilai hash SHA-256 dari data bytes dan mengembalikan format heksadesimal."""
     digest = hashlib.sha256(data).hexdigest()

@@ -23,11 +23,23 @@ Aplikasi mendukung **dua jalur penandatanganan**:
 * **Berkas PDF** — tanda tangan tertanam di dalam berkas: lencana visual QR-Code + blok integritas kriptografis.
 * **Berkas Gambar** (PNG, JPG/JPEG, WEBP, GIF, BMP) — skema **Embedded Signature**: blok integritas kriptografis disematkan langsung ke dalam berkas, sehingga cukup satu berkas saja dan gambar tetap tampil normal.
 
+### Verifikasi Mandiri via QR-Code
+QR-Code pada lencana memuat **URL verifikasi mandiri** yang membawa payload terkompresi
+(identitas penandatangan, hash dokumen, tanda tangan ECDSA, dan kunci publik terkompresi).
+Cukup **memindai QR** dengan kamera ponsel: aplikasi otomatis membuka modul Verifikasi dan
+menampilkan hasil verifikasi tanda tangan **tanpa perlu mengunggah berkas**.
+
+* Tanda tangan pada QR **mengikat identitas penandatangan** (*signed attributes*), sehingga
+  mengubah nama/NPM/tanggal/hash akan menggagalkan verifikasi.
+* Aplikasi juga menampilkan **fingerprint kunci publik** untuk dicocokkan dengan daftar kunci
+  resmi (*trust anchor*) — menutup celah "QR buatan sendiri".
+* Untuk bukti terkuat, unggah berkas asli: sistem membandingkan hash-nya dengan hash di QR.
+
 ### Spesifikasi Teknis
 * **Algoritma Asimetris:** ECDSA (*Elliptic Curve Digital Signature Algorithm*) dengan kurva **NIST P-256 (secp256r1)**.
 * **Fungsi Hash:** **SHA-256** (*Secure Hash Algorithm 256-bit*).
 * **Proteksi Kunci Privat:** Enkripsi *Private Key* menggunakan **AES-256-GCM** berbasis kata sandi (*passphrase*).
-* **Penanda Visual Dokumen:** **QR-Code** memuat metadata penandatanganan dan tanda tangan digital terenkode Base64 (khusus berkas PDF).
+* **Penanda Visual Dokumen:** **QR-Code** memuat URL verifikasi mandiri + payload tanda tangan (khusus berkas PDF).
 
 ---
 
@@ -43,7 +55,8 @@ Aplikasi mendukung **dua jalur penandatanganan**:
 ├── benchmark.py           # Script pengujian kuantitatif & ekspor Excel (.xlsx)
 └── tests/                 # Unit test otomatis (minimal 5 skenario uji wajib)
     ├── test_crypto.py     # Pengujian modul kriptografi
-    └── test_generic.py    # Pengujian modul penandatanganan berkas gambar
+    ├── test_generic.py    # Pengujian modul penandatanganan berkas gambar
+    └── test_qr_verification.py  # Pengujian verifikasi mandiri via QR-Code
 ```
 
 ---

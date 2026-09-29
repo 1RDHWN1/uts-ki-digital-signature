@@ -18,8 +18,13 @@ from crypto_engine import (
     load_private_key_pem,
     hash_bytes,
 )
-from pdf_stamper import sign_and_stamp_pdf, SIG_MARKER_START, SIG_MARKER_END
-from verifier import verify_pdf_document
+from pdf_stamper import (
+    sign_and_stamp_pdf,
+    SIG_MARKER_START,
+    SIG_MARKER_END,
+    parse_qr_verification_payload,
+)
+from verifier import verify_pdf_document, verify_qr_payload
 from generic_signer import (
     sign_generic_file,
     verify_generic_file,
@@ -88,6 +93,28 @@ def render_toasts():
     toast_html = '<div class="sc-toast-wrap">' + "".join(cards_html) + '</div>'
     st.markdown(toast_html, unsafe_allow_html=True)
     st.session_state["sc_toast_queue"] = []
+
+
+# ----------------- PENANGANAN PINDAI QR-CODE (?verify=auto) -----------------
+# Saat QR-Code dipindai, browser membuka URL dengan parameter verify=auto dan
+# payload Base64 (p). Handler ini mengurai payload, memverifikasi tanda tangan
+# ECDSA secara mandiri, lalu mengarahkan aplikasi ke modul Verifikasi.
+_qp_verify = None
+_qp_payload = None
+try:
+    _qp_verify = st.query_params.get("verify")
+    _qp_payload = st.query_params.get("p")
+except Exception:
+    _qp_verify = None
+    _qp_payload = None
+
+if _qp_verify == "auto" and _qp_payload:
+    _qr_parsed = parse_qr_verification_payload(_qp_payload)
+    if _qr_parsed is not None:
+        st.session_state["qr_scan_payload"] = _qr_parsed
+        st.session_state["qr_scan_result"] = verify_qr_payload(_qr_parsed)
+        st.session_state["nav_sidebar"] = "3. Verifikasi Integritas"
+        st.session_state["qr_scan_active"] = True
 
 
 # ----------------- SIDEBAR & NAVIGASI SISTEM -----------------
@@ -1322,6 +1349,55 @@ elif nav_choice == "2. Penandatanganan Dokumen":
 # ==============================================================================
 elif nav_choice == "3. Verifikasi Integritas":
     st.subheader("Verifikasi Keaslian & Uji Integritas Dokumen")
+
+    # --- Panel hasil pindai QR-Code (bila pengguna datang dari memindai QR) ---
+    if st.session_state.get("qr_scan_active") and st.session_state.get("qr_scan_result"):
+        _qr = st.session_state["qr_scan_result"]
+        _qr_id = _qr.get("identity", {})
+        _qr_status = _qr.get("status", "")
+
+        st.markdown("##### Hasil Pindai QR-Code")
+        if _qr_status == "VALID_QR":
+            st.success(
+                "QR-Code VALID — tanda tangan digital di dalam QR terverifikasi "
+                "secara kriptografis (ECDSA NIST P-256)."
+            )
+        elif _qr_status == "SIGNATURE_INVALID":
+            st.error(
+                "QR-Code TIDAK VALID — tanda tangan tidak cocok. QR kemungkinan "
+                "dimodifikasi atau dipalsukan."
+            )
+        else:
+            st.warning("QR-Code tidak dapat diverifikasi — payload tidak lengkap atau rusak.")
+
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            st.markdown("**Identitas Penandatangan (dari QR)**")
+            st.markdown(
+                f"- Nama: **{_qr_id.get('signer', '-')}**\n"
+                f"- NPM/NIP: **{_qr_id.get('id', '-')}**\n"
+                f"- Institusi: **{_qr_id.get('institution', '-')}**\n"
+                f"- Waktu: **{_qr_id.get('date', '-')}**"
+            )
+        with _c2:
+            st.markdown("**Bukti Kriptografis**")
+            st.markdown(
+                f"- Hash dokumen (SHA-256):\n`{_qr.get('doc_hash', '-')}`"
+            )
+            _fp = _qr.get("public_key_fingerprint")
+            if _fp:
+                st.markdown(f"- Fingerprint Kunci Publik:\n`{_fp}`")
+
+        st.info(
+            "Langkah penguatan (opsional): cocokkan **Fingerprint Kunci Publik** di atas "
+            "dengan daftar kunci resmi, dan unggah berkas asli di bawah untuk memastikan "
+            "hash-nya identik. Pencocokan fingerprint menutup celah 'QR buatan sendiri'."
+        )
+        if st.button("Tutup Hasil Pindai QR", key="qr_scan_close"):
+            st.session_state["qr_scan_active"] = False
+            st.rerun()
+        st.markdown("---")
+
     st.write(
         "Unggah berkas untuk menguji keabsahan tanda tangan digital serta memastikan "
         "tidak terdapat manipulasi isi (bahkan perubahan sebesar 1 byte). Mendukung berkas "

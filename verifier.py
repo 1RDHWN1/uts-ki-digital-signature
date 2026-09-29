@@ -19,9 +19,11 @@ from pypdf import PdfReader
 
 from crypto_engine import (
     load_public_key_pem,
+    load_public_key_compressed_b64,
+    public_key_fingerprint,
     verify_hash,
 )
-from pdf_stamper import SIG_MARKER_START, SIG_MARKER_END
+from pdf_stamper import SIG_MARKER_START, SIG_MARKER_END, qr_signed_digest
 
 
 def extract_signature_block(pdf_bytes: bytes) -> Tuple[bytes, Optional[Dict[str, Any]]]:
@@ -99,6 +101,89 @@ def _read_pdf_marker(pdf_bytes: bytes) -> Optional[Dict[str, str]]:
         pass
 
     return None
+
+
+def verify_qr_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Memverifikasi tanda tangan ECDSA yang tertanam di dalam payload QR-Code.
+
+    Verifikasi ini bersifat *mandiri* (tanpa berkas): ia membuktikan bahwa QR dibuat
+    oleh pemilik Private Key yang bersesuaian dengan Public Key di dalam payload,
+    lalu menampilkan fingerprint kunci publik sebagai bahan pencocokan manual
+    terhadap daftar kunci resmi (trust anchor).
+
+    Catatan keamanan: karena Public Key ikut dibawa di dalam payload, hasil VALID
+    di sini berarti "tanda tangan internal konsisten" — BUKAN bukti bahwa berkas
+    fisik yang dipegang pengguna cocok. Untuk bukti kuat, cocokkan hash dokumen
+    (``payload['hash']``) dengan berkas asli, dan cocokkan fingerprint terhadap
+    daftar kunci resmi.
+    """
+    if not isinstance(payload, dict):
+        return {"valid": False, "status": "INVALID_QR",
+                "message": "Payload QR tidak dapat dibaca."}
+
+    sig_b64 = payload.get("sig", "")
+    pub_b64 = payload.get("pub", "")
+    doc_hash = payload.get("hash", "")
+
+    if not sig_b64 or not pub_b64 or not doc_hash:
+        return {"valid": False, "status": "INVALID_QR",
+                "message": "Payload QR tidak lengkap (signature/kunci/hash tidak ditemukan).",
+                "identity": _qr_identity(payload)}
+
+    try:
+        pub_key = load_public_key_compressed_b64(pub_b64)
+    except Exception:
+        return {"valid": False, "status": "INVALID_QR",
+                "message": "Kunci publik di dalam QR tidak valid atau rusak.",
+                "identity": _qr_identity(payload)}
+
+    try:
+        bytes.fromhex(doc_hash)
+    except Exception:
+        return {"valid": False, "status": "INVALID_QR",
+                "message": "Hash dokumen di dalam QR tidak valid.",
+                "identity": _qr_identity(payload)}
+
+    # Verifikasi tanda tangan atas digest yang MENGIKAT identitas + hash dokumen,
+    # sehingga perubahan pada nama/identitas mana pun akan menggagalkan verifikasi.
+    bound_digest = qr_signed_digest(
+        payload.get("signer", ""),
+        payload.get("id", ""),
+        payload.get("inst", ""),
+        payload.get("date", ""),
+        doc_hash,
+    )
+    is_valid = verify_hash(pub_key, sig_b64, bound_digest)
+
+    if not is_valid:
+        return {
+            "valid": False,
+            "status": "SIGNATURE_INVALID",
+            "message": ("Tanda tangan di dalam QR TIDAK VALID. QR kemungkinan telah "
+                        "dimodifikasi atau dipalsukan."),
+            "identity": _qr_identity(payload),
+            "doc_hash": doc_hash,
+        }
+
+    return {
+        "valid": True,
+        "status": "VALID_QR",
+        "message": ("Tanda tangan digital di dalam QR VALID. QR dibuat oleh pemilik "
+                    "Private Key yang bersesuaian dengan kunci publik terlampir."),
+        "identity": _qr_identity(payload),
+        "doc_hash": doc_hash,
+        "public_key_fingerprint": public_key_fingerprint(pub_key),
+    }
+
+
+def _qr_identity(payload: Dict[str, Any]) -> Dict[str, str]:
+    """Menyusun ringkasan identitas penandatangan dari payload QR."""
+    return {
+        "signer": payload.get("signer", "-"),
+        "id": payload.get("id", "-"),
+        "institution": payload.get("inst", "-"),
+        "date": payload.get("date", "-"),
+    }
 
 
 def verify_pdf_document(

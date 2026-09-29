@@ -12,6 +12,7 @@ Fitur:
 
 import io
 import json
+import zlib
 import base64
 import hashlib
 from datetime import datetime
@@ -24,10 +25,86 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 from reportlab.lib.utils import ImageReader
 
-from crypto_engine import sign_hash, ec
+from crypto_engine import (
+    sign_hash,
+    load_public_key_pem,
+    export_public_key_compressed_b64,
+    ec,
+)
 
 SIG_MARKER_START = b"\n% === UNSIL DIGITAL SIGNATURE INTEGRITY BLOCK ===\n"
 SIG_MARKER_END = b"\n% === END UNSIL DIGITAL SIGNATURE INTEGRITY BLOCK ===\n"
+
+# Parameter kueri yang dipakai QR-Code agar aplikasi otomatis membuka modul verifikasi.
+QR_VERIFY_PARAM = "verify"
+
+
+def qr_signed_digest(signer_name: str, signer_id: str, institution: str,
+                     date_str: str, doc_hash: str) -> bytes:
+    """Menghitung digest yang ditandatangani untuk payload QR-Code.
+
+    Digest ini mengikat **identitas penandatangan + waktu + hash dokumen** menjadi
+    satu kesatuan (mirip *signed attributes* pada CMS/PAdES). Akibatnya, mengubah
+    nama/identitas mana pun di dalam payload akan membuat tanda tangan tidak lagi
+    cocok — sehingga nama pada QR tidak dapat dipalsukan.
+    """
+    canonical = f"{signer_name}|{signer_id}|{institution}|{date_str}|{doc_hash}"
+    return hashlib.sha256(canonical.encode("utf-8")).digest()
+
+
+def build_qr_verification_payload(
+    verification_url_base: str,
+    signer_name: str,
+    signer_id: str,
+    institution: str,
+    date_str: str,
+    base_doc_hash: str,
+    signature_b64: str,
+    public_key_b64: str,
+) -> str:
+    """Menyusun URL verifikasi yang disematkan ke dalam QR-Code.
+
+    URL memuat parameter ``verify=auto`` (pemicu modul verifikasi) dan ``p``
+    (payload Base64-URL) berisi identitas penandatangan, hash dokumen, tanda tangan
+    ECDSA, serta kunci publik terkompresi. Dengan begitu, satu pindaian QR cukup
+    untuk menampilkan hasil verifikasi tanda tangan tanpa perlu mengunggah berkas.
+
+    Payload dikompresi dengan zlib sebelum di-encode Base64-URL agar QR-Code yang
+    dihasilkan lebih renggang (versi lebih kecil) sehingga lebih mudah dipindai.
+    """
+    payload = {
+        "v": 1,
+        "signer": signer_name,
+        "id": signer_id,
+        "inst": institution,
+        "date": date_str,
+        "hash": base_doc_hash,
+        "sig": signature_b64,
+        "pub": public_key_b64,
+    }
+    raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    compressed = zlib.compress(raw, 9)
+    token = base64.urlsafe_b64encode(compressed).decode("utf-8").rstrip("=")
+    return f"{verification_url_base}/?{QR_VERIFY_PARAM}=auto&z=1&p={token}"
+
+
+def parse_qr_verification_payload(token: str) -> Optional[Dict[str, Any]]:
+    """Mengurai kembali payload QR-Code dari parameter ``p`` (Base64-URL).
+
+    Mendukung payload terkompresi zlib (format saat ini). Bila dekompresi gagal,
+    fungsi mencoba menafsirkan token sebagai JSON Base64 biasa (kompatibilitas).
+    """
+    try:
+        padded = token + "=" * ((-len(token)) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode("utf-8"))
+        try:
+            raw = zlib.decompress(raw)
+        except Exception:
+            pass  # bukan payload terkompresi; coba tafsirkan langsung
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
 
 
 def create_qr_code_image(data_text: str, box_size: int = 4, border: int = 1) -> bytes:
@@ -107,8 +184,8 @@ def create_signature_badge_pdf(
     date_str: str,
     qr_png_bytes: bytes,
     position: str = "bottom-right",
-    badge_width: float = 205.0,
-    badge_height: float = 76.0,
+    badge_width: float = 232.0,
+    badge_height: float = 90.0,
     slot_index: int = 0,
 ) -> bytes:
     """Membuat dokumen PDF satu halaman transparan berisi badge tanda tangan digital."""
@@ -139,38 +216,39 @@ def create_signature_badge_pdf(
     c.roundRect(x, y, badge_width, badge_height, 6, fill=1, stroke=1)
 
     # 2. Header Bar Warna Biru UNSIL
-    header_height = 18.0
+    header_height = 20.0
     c.setFillColor(HexColor("#0B3C5D"))
     c.roundRect(x, y + badge_height - header_height, badge_width, header_height, 4, fill=1, stroke=0)
     
     # 3. Teks Header
     c.setFillColor(HexColor("#FFFFFF"))
-    c.setFont("Helvetica-Bold", 7.5)
-    c.drawCentredString(x + (badge_width / 2.0), y + badge_height - 13.0, "DITANDATANGANI SECARA DIGITAL")
+    c.setFont("Helvetica-Bold", 8.0)
+    c.drawCentredString(x + (badge_width / 2.0), y + badge_height - 14.0, "DITANDATANGANI SECARA DIGITAL")
 
     # 4. Informasi Penandatangan
-    text_x = x + 10.0
+    text_x = x + 11.0
     c.setFillColor(HexColor("#0F172A"))
-    c.setFont("Helvetica-Bold", 8.5)
+    c.setFont("Helvetica-Bold", 9.0)
     name_display = signer_name if len(signer_name) <= 24 else signer_name[:22] + ".."
-    c.drawString(text_x, y + 49.0, name_display)
+    c.drawString(text_x, y + 60.0, name_display)
 
-    c.setFont("Helvetica", 7.2)
+    c.setFont("Helvetica", 7.4)
     c.setFillColor(HexColor("#334155"))
     id_label = f"NPM/NIP: {signer_id}"
-    c.drawString(text_x, y + 37.0, id_label)
+    c.drawString(text_x, y + 46.0, id_label)
 
     inst_display = institution if len(institution) <= 26 else institution[:24] + ".."
-    c.drawString(text_x, y + 26.0, inst_display)
+    c.drawString(text_x, y + 34.0, inst_display)
 
     c.setFillColor(HexColor("#166534"))  # Hijau status valid
-    c.setFont("Helvetica-Bold", 6.8)
-    c.drawString(text_x, y + 14.0, f"Terverifikasi: {date_str}")
+    c.setFont("Helvetica-Bold", 7.0)
+    c.drawString(text_x, y + 21.0, f"Terverifikasi: {date_str}")
 
     # 5. Penempelan Gambar QR-Code di sisi kanan badge.
-    #    Ukuran & posisi diatur agar TIDAK menutupi header bar di bagian atas.
-    qr_size = 50.0
-    qr_x = x + badge_width - qr_size - 7.0
+    #    Ukuran & posisi diatur agar TIDAK menutupi header bar di bagian atas, dan
+    #    cukup besar agar QR (versi ~11) tetap mudah dipindai dari layar/kertas.
+    qr_size = 64.0
+    qr_x = x + badge_width - qr_size - 8.0
     qr_y = y + 6.0
     qr_reader = ImageReader(io.BytesIO(qr_png_bytes))
     c.drawImage(qr_reader, qr_x, qr_y, width=qr_size, height=qr_size)
@@ -231,16 +309,34 @@ def sign_and_stamp_pdf(
     page_w = float(last_page.mediabox.width)
     page_h = float(last_page.mediabox.height)
 
-    # 3. Payload ringkas untuk QR-Code
-    qr_payload = json.dumps({
-        "app": "SignaCerta-UNSIL",
-        "signer": signer_name,
-        "id": signer_id,
-        "inst": institution,
-        "date": date_str,
-        "hash": base_doc_hash[:16] + "...",
-        "verify_url": f"{verification_url_base}?verify=auto"
-    }, separators=(',', ':'))
+    # 3. Hitung tanda tangan ECDSA atas digest dokumen SEBELUM QR dibuat.
+    #    `sig_b64` menandatangani hash dokumen (dipakai blok integritas PDF),
+    #    sedangkan `qr_sig_b64` menandatangani digest yang MENGIKAT identitas +
+    #    hash dokumen, sehingga nama pada QR tidak dapat dipalsukan.
+    sig_b64 = sign_hash(private_key, digest_to_sign)
+    qr_sig_b64 = sign_hash(
+        private_key,
+        qr_signed_digest(signer_name, signer_id, institution, date_str, base_doc_hash),
+    )
+
+    # 3b. Siapkan kunci publik terkompresi (44 char) untuk payload QR.
+    try:
+        pub_key_obj = load_public_key_pem(public_key_pem)
+        pub_b64_compact = export_public_key_compressed_b64(pub_key_obj)
+    except Exception:
+        pub_b64_compact = ""
+
+    # 3c. Payload QR: URL verifikasi mandiri (scan -> auto buka modul verifikasi).
+    qr_payload = build_qr_verification_payload(
+        verification_url_base=verification_url_base,
+        signer_name=signer_name,
+        signer_id=signer_id,
+        institution=institution,
+        date_str=date_str,
+        base_doc_hash=base_doc_hash,
+        signature_b64=qr_sig_b64,
+        public_key_b64=pub_b64_compact,
+    )
 
     qr_bytes = create_qr_code_image(qr_payload)
 
@@ -287,8 +383,8 @@ def sign_and_stamp_pdf(
     # 6. Hitung Hash SHA-256 dari seluruh isi PDF visual akhir
     final_file_hash_hex = hashlib.sha256(stamped_clean_bytes).hexdigest()
 
-    # 7. Tandatangani Digest dokumen yang disetujui menggunakan Private Key ECDSA P-256
-    sig_b64 = sign_hash(private_key, digest_to_sign)
+    # 7. Tanda tangan ECDSA (sig_b64) sudah dihitung pada langkah 3 agar dapat
+    #    disematkan ke dalam QR-Code; tidak perlu ditandatangani ulang di sini.
 
     # 8. Susun metadata tanda tangan
     new_signature_record = {
