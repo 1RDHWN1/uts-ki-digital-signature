@@ -59,6 +59,9 @@ GENERIC_MARKER_END = b"\n% === END SIGNACERTA ===\n"
 
 # Penanda sentinel di metadata internal gambar (ASCII-safe, berbasis base64url)
 MARKER_PREFIX = b"SignaCerta-Sig:"
+# Terminator eksplisit: karakter yang TIDAK ada dalam alfabet base64url, sehingga
+# parser tahu persis di mana token berakhir (mencegah byte CRC/header ikut terbaca).
+MARKER_TERMINATOR = b"|"
 
 # Ekstensi berkas gambar yang didukung
 SUPPORTED_GENERIC_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp"]
@@ -77,7 +80,7 @@ def _build_marker(signer_name: str, signer_id: str, date_str: str) -> bytes:
         "date": date_str,
     }
     raw = json.dumps(summary, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-    return MARKER_PREFIX + base64.urlsafe_b64encode(raw)
+    return MARKER_PREFIX + base64.urlsafe_b64encode(raw) + MARKER_TERMINATOR
 
 
 def _png_insert_text(png_bytes: bytes, marker: bytes) -> bytes:
@@ -146,16 +149,37 @@ def _read_marker(file_bytes: bytes) -> Optional[Dict[str, Any]]:
     if idx == -1:
         return None
     start = idx + len(MARKER_PREFIX)
+
+    # 1. Cara utama: potong pada terminator eksplisit '|' (bukan bagian alfabet
+    #    base64url), sehingga byte CRC/header setelahnya tidak ikut terbaca.
+    term = file_bytes.find(MARKER_TERMINATOR, start)
+    candidates = []
+    if term != -1:
+        candidates.append(file_bytes[start:term])
+
+    # 2. Cadangan: baca karakter base64url berturut-turut, lalu coba semua
+    #    panjang kelipatan 4 (dari terpanjang) sampai berhasil didekode.
     valid = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
     end = start
     while end < len(file_bytes) and file_bytes[end] in valid:
         end += 1
-    try:
-        raw = base64.urlsafe_b64decode(file_bytes[start:end])
-        data = json.loads(raw.decode("utf-8"))
-        return data if isinstance(data, dict) else None
-    except Exception:
-        return None
+    greedy = file_bytes[start:end]
+    for trim in range(0, 4):
+        if len(greedy) - trim > 0:
+            candidates.append(greedy[: len(greedy) - trim])
+
+    for token in candidates:
+        if not token:
+            continue
+        padded = token + b"=" * ((-len(token)) % 4)
+        try:
+            raw = base64.urlsafe_b64decode(padded)
+            data = json.loads(raw.decode("utf-8"))
+            if isinstance(data, dict) and "signer" in data:
+                return data
+        except Exception:
+            continue
+    return None
 
 
 # ---------------------------------------------------------------------------

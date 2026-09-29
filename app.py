@@ -1093,7 +1093,18 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                             sub = parts[1].split(SIG_MARKER_END)[0]
                             prev_meta = json.loads(sub.decode("utf-8"))
                             existing_signers_count = prev_meta.get("total_signers", len(prev_meta.get("signatures", [])))
-                            st.info(f"Dokumen ini telah memiliki {existing_signers_count} tanda tangan sebelumnya. Sistem otomatis mengaktifkan mode tanda tangan berjenjang (Multiple Signers).")
+                            prev_sigs = prev_meta.get("signatures", [])
+                            prev_names = ", ".join(
+                                f"{s.get('signer', '-')} ({s.get('id', '-')})" for s in prev_sigs
+                            ) or "-"
+                            st.warning(
+                                f"**Mode Tanda Tangan Berjenjang (Multiple Signers) Aktif**\n\n"
+                                f"Dokumen ini sudah ditandatangani oleh **{existing_signers_count} pihak**: "
+                                f"{prev_names}.\n\n"
+                                f"Tanda tangan Anda akan ditambahkan **tanpa merusak** tanda tangan sebelumnya. "
+                                f"Lencana Anda otomatis ditempatkan pada slot kosong agar **tidak menumpuk** "
+                                f"dengan lencana pihak terdahulu."
+                            )
                     else:
                         st.caption(f"Informasi Berkas: **{pdf_file.name}** ({len(pdf_bytes_tmp)/1024:.1f} KB) • Berkas Gambar")
                         st.info(
@@ -1120,32 +1131,18 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             with ci_2:
                 institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
                 
-                pos_options = ["bottom-right", "bottom-left", "bottom-center"]
-                default_pos_idx = 0
-                if existing_signers_count == 1:
-                    default_pos_idx = 1
-                elif existing_signers_count >= 2:
-                    default_pos_idx = 2
-                
-                if pdf_file and pdf_bytes_tmp is not None and is_pdf_file:
-                    file_sig_key = f"{pdf_file.name}_{len(pdf_bytes_tmp)}"
-                    if st.session_state.get("last_uploaded_file_key") != file_sig_key:
-                        st.session_state["last_uploaded_file_key"] = file_sig_key
-                        st.session_state["pos_in"] = pos_options[default_pos_idx]
-                
-                # Pemilih posisi lencana hanya relevan untuk berkas PDF
+                # Pemilih posisi lencana hanya relevan untuk berkas PDF.
+                # Sistem sudah otomatis menata lencana secara berjenjang
+                # (anti-collision), sehingga pengguna tidak perlu mengatur manual.
                 if is_pdf_file or not pdf_file:
-                    stamp_pos = st.selectbox(
-                        "Posisi Lencana Tanda Tangan QR:",
-                        pos_options,
-                        index=default_pos_idx,
-                        key="pos_in",
-                        help="Sistem otomatis memilih posisi yang kosong agar tidak menimpa tanda tangan pihak terdahulu.",
-                    )
-                    if existing_signers_count == 1 and stamp_pos == "bottom-right":
-                        st.caption("⚠️ Catatan: Posisi *bottom-right* kemungkinan telah ditempati penandatangan pertama. Disarankan memilih *bottom-left*.")
-                    elif existing_signers_count >= 2 and stamp_pos in ["bottom-right", "bottom-left"]:
-                        st.caption("⚠️ Catatan: Posisi ini kemungkinan telah terisi. Disarankan memilih *bottom-center*.")
+                    stamp_pos = "bottom-right"
+                    if existing_signers_count == 0:
+                        st.caption("Lencana tanda tangan akan ditempatkan otomatis di sudut kanan bawah halaman terakhir.")
+                    else:
+                        st.caption(
+                            f"Lencana Anda akan ditempatkan otomatis pada slot ke-{existing_signers_count + 1} "
+                            f"(bertingkat, tidak menumpuk dengan {existing_signers_count} lencana sebelumnya)."
+                        )
                 else:
                     # Berkas gambar: tidak memakai lencana visual
                     stamp_pos = "bottom-right"
