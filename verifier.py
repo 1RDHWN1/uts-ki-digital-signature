@@ -10,9 +10,12 @@ Fitur:
 - Mendukung verifikasi multiple signatures (tanda tangan berjenjang).
 """
 
+import io
 import json
 import hashlib
 from typing import Dict, Any, Optional, Tuple
+
+from pypdf import PdfReader
 
 from crypto_engine import (
     load_public_key_pem,
@@ -39,6 +42,65 @@ def extract_signature_block(pdf_bytes: bytes) -> Tuple[bytes, Optional[Dict[str,
         return clean_bytes, None
 
 
+def _read_pdf_marker(pdf_bytes: bytes) -> Optional[Dict[str, str]]:
+    """Membaca sentinel marker SignaCerta dari dokumen PDF (bila ada).
+
+    Marker dicari pada dua tempat:
+    1. Content stream halaman (bertahan walau dokumen ditulis ulang / dikompres).
+    2. Metadata DocInfo (sebagai cadangan).
+
+    Marker ini adalah jejak non-kriptografis yang ditulis saat penandatanganan,
+    sehingga dokumen yang pernah ditandatangani lalu ditulis ulang (mis. dikompres)
+    masih dapat dikenali walaupun blok integritasnya sudah hilang.
+    """
+    def _parse(raw: str) -> Optional[Dict[str, str]]:
+        idx = raw.find("SignaCerta-Sig:")
+        if idx == -1:
+            return None
+        payload = raw[idx + len("SignaCerta-Sig:"):]
+        # Ambil hanya sampai karakter yang jelas akhir penanda (baris baru / kutip / kurung).
+        for stop in ("\n", "\r", ")", "]", "'", '"', "\\"):
+            p = payload.find(stop)
+            if p != -1:
+                payload = payload[:p]
+        parts = payload.split("|")
+        return {
+            "signer": parts[0].strip() if len(parts) > 0 and parts[0].strip() else "-",
+            "id": parts[1].strip() if len(parts) > 1 else "-",
+            "date": parts[2].strip() if len(parts) > 2 else "-",
+        }
+
+    # --- 1. Cari pada content stream halaman ---
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        for page in reader.pages:
+            try:
+                text = page.extract_text() or ""
+            except Exception:
+                text = ""
+            if "SignaCerta-Sig:" in text:
+                parsed = _parse(text)
+                if parsed:
+                    return parsed
+    except Exception:
+        pass
+
+    # --- 2. Cari pada metadata DocInfo ---
+    try:
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        meta = reader.metadata or {}
+        for k, v in meta.items():
+            sv = str(v)
+            if "SignaCerta-Sig:" in sv:
+                parsed = _parse(sv)
+                if parsed:
+                    return parsed
+    except Exception:
+        pass
+
+    return None
+
+
 def verify_pdf_document(
     pdf_bytes: bytes,
     custom_public_key_pem: Optional[bytes] = None,
@@ -47,7 +109,8 @@ def verify_pdf_document(
     
     Status Kembalian:
     - VALID: Dokumen 100% asli, hash cocok, dan tanda tangan digital terverifikasi.
-    - TAMPERED: Isi dokumen telah diubah setelah penandatanganan (integritas rusak).
+    - TAMPERED: Isi dokumen telah diubah setelah penandatanganan (integritas rusak),
+      ATAU dokumen pernah ditandatangani tetapi blok integritasnya hilang.
     - KEY_MISMATCH: Tanda tangan gagal diverifikasi dengan Public Key yang diberikan.
     - UNSIGNED: Dokumen belum dibubuhi blok tanda tangan digital.
     - CORRUPTED_METADATA: Blok tanda tangan rusak atau tidak dapat dibaca.
@@ -55,6 +118,26 @@ def verify_pdf_document(
     clean_bytes, metadata = extract_signature_block(pdf_bytes)
 
     if metadata is None:
+        # Blok integritas tidak ada. Periksa sentinel marker pada metadata PDF
+        # untuk membedakan dokumen yang belum pernah ditandatangani vs yang
+        # pernah ditandatangani lalu ditulis ulang (mis. dikompres).
+        marker = _read_pdf_marker(pdf_bytes)
+        if marker is not None:
+            return {
+                "valid": False,
+                "status": "TAMPERED",
+                "message": (
+                    "PERINGATAN: Dokumen ini pernah ditandatangani, tetapi blok integritas "
+                    "kriptografisnya tidak ditemukan. Kemungkinan dokumen telah diedit, "
+                    "dikompres, atau ditulis ulang oleh aplikasi lain sehingga blok tanda "
+                    "tangan terhapus."
+                ),
+                "marker_info": marker,
+                "details": {
+                    "detected_signer": marker.get("signer", "-"),
+                    "detected_date": marker.get("date", "-"),
+                },
+            }
         return {
             "valid": False,
             "status": "UNSIGNED",
