@@ -41,8 +41,10 @@ import base64
 import json
 import struct
 import zlib
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, Tuple
+
+WIB = timezone(timedelta(hours=7))
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -254,7 +256,7 @@ def sign_generic_file(
         - payload: dict metadata tanda tangan yang tersimpan dalam blok.
     """
     if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        date_str = datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
 
     # 1. Pisahkan konten asli dari blok tanda tangan sebelumnya (bila ada)
     clean_bytes, prev_payload = extract_signature_block(file_bytes)
