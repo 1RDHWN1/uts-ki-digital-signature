@@ -1143,47 +1143,52 @@ elif nav_choice == "2. Penandatanganan Dokumen":
                 except Exception:
                     pass
 
-            c_q1, c_q2 = st.columns([3, 1])
-            with c_q2:
-                btn_preset = st.button("Isi Cepat Demo", help="Mengisi kolom dengan profil anggota kelompok secara otomatis untuk demonstrasi cepat.", use_container_width=True)
+            # Subheader Identitas dan Tombol Bantuan Demo
+            col_id_head, col_id_btn = st.columns([2.5, 1.2])
+            with col_id_head:
+                st.markdown("###### Identitas Resmi Penandatangan")
+            with col_id_btn:
+                btn_preset = st.button("Isi Data Demo", help="Memuat profil pengujian demonstrasi secara otomatis.", use_container_width=True)
             
             val_name = "Fachri Ridhwan Imani" if btn_preset else ""
             val_id = "247006111140" if btn_preset else ""
             val_inst = "Universitas Siliwangi" if btn_preset else ""
 
+            # Input Nama dan Nomor Identitas berdampingan secara simetris
             ci_1, ci_2 = st.columns(2)
             with ci_1:
                 signer_name = st.text_input("Nama Lengkap Penandatangan:", value=val_name, placeholder="Contoh: Fachri Ridhwan Imani", key="name_in")
-                signer_id = st.text_input("NPM / NIP / NIDN:", value=val_id, placeholder="Contoh: 247006111140", key="id_in")
             with ci_2:
-                institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
+                signer_id = st.text_input("NPM / NIP / NIDN:", value=val_id, placeholder="Contoh: 247006111140", key="id_in")
+
+            # Input Institusi satu baris penuh agar tata letak seimbang
+            institution = st.text_input("Institusi / Fakultas / Lembaga Penandatangan:", value=val_inst, placeholder="Contoh: Fakultas Teknik, Universitas Siliwangi", key="inst_in")
                 
-                # Pemilih tata letak stempel visual untuk berkas PDF
-                if is_pdf_file or not pdf_file:
-                    st.markdown("**Tata Letak Stempel QR-Code:**")
-                    placement_options = [
-                        "📄 Lembar Pengesahan Khusus (Rekomendasi — 100% Bebas Tertimpa Teks)",
-                        "📌 Halaman Terakhir Dokumen Asli (Pojok Kanan Bawah)",
-                    ]
-                    placement_sel = st.radio(
-                        "Pilihan Penempatan Stempel:",
-                        options=placement_options,
-                        index=0,
-                        label_visibility="collapsed",
-                        help="Lembar Pengesahan Khusus membuat 1 halaman formal di akhir berkas sehingga teks, tabel, atau diagram asli 100% aman dan tidak tertimpa stempel.",
-                    )
-                    if "Lembar Pengesahan" in placement_sel:
-                        stamp_pos = "new_page"
-                        if existing_signers_count == 0:
-                            st.caption("✨ Dokumen akan dilengkapi 1 halaman Lembar Pengesahan resmi di akhir berkas. Seluruh isi teks/tabel asli tetap 100% bersih tanpa tertimpa.")
-                        else:
-                            st.caption(f"✨ Lencana tanda tangan Anda otomatis ditempatkan pada Slot {existing_signers_count + 1} di Lembar Pengesahan tanpa menambah halaman baru.")
+            # Pemilih tata letak stempel visual untuk berkas PDF
+            if is_pdf_file or not pdf_file:
+                st.markdown("###### Tata Letak Stempel Pengesahan")
+                placement_options = [
+                    "Lembar Pengesahan Khusus (Halaman Terpisah — Mencegah Tertimpa Teks)",
+                    "Halaman Terakhir Dokumen (Sudut Kanan Bawah)",
+                ]
+                placement_sel = st.radio(
+                    "Pilihan Penempatan Stempel:",
+                    options=placement_options,
+                    index=0,
+                    label_visibility="collapsed",
+                )
+                if "Lembar Pengesahan" in placement_sel:
+                    stamp_pos = "new_page"
+                    if existing_signers_count == 0:
+                        st.caption("Sistem akan menerbitkan lembar pengesahan resmi di akhir berkas. Seluruh teks dan diagram dokumen asli dijamin tetap utuh tanpa tertimpa stempel.")
                     else:
-                        stamp_pos = "bottom-right"
-                        st.caption("Lencana ditempelkan di sudut kanan bawah halaman terakhir berkas asli (cocok jika dokumen memiliki area kosong di bagian bawah).")
+                        st.caption(f"Lencana tanda tangan dialokasikan pada Slot {existing_signers_count + 1} di Lembar Pengesahan yang telah ada tanpa menambah halaman baru.")
                 else:
-                    # Berkas gambar: tidak memakai lencana visual
                     stamp_pos = "bottom-right"
+                    st.caption("Lencana tanda tangan ditempatkan di sudut kanan bawah halaman terakhir berkas asli.")
+            else:
+                # Berkas gambar: tidak memakai lencana visual
+                stamp_pos = "bottom-right"
 
             st.markdown("---")
             st.markdown("###### Otorisasi Kunci Privat Penandatangan")
