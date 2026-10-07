@@ -128,6 +128,40 @@ class TestGenericSigner(unittest.TestCase):
         self.assertEqual(result["status"], "UNSIGNED")
         self.assertIsNone(result.get("marker_info"))
 
+    def test_11_multiple_signers_custom_public_key(self):
+        """Uji 11: Multi-signer diuji dengan public key milik salah satu pihak harus VALID."""
+        signed_1, _ = self._sign()
+        priv_2, pub_2 = generate_keypair()
+        pub_2_pem = export_public_key_pem(pub_2)
+        signed_2, _ = sign_generic_file(
+            file_bytes=signed_1,
+            original_filename="foto.png",
+            private_key=priv_2,
+            public_key_pem=pub_2_pem,
+            signer_name="Wardah Nurwaffiq",
+            signer_id="247006111150",
+        )
+
+        # Uji dengan kunci Pihak 1 (milik self._sign())
+        res_key1 = verify_generic_file(signed_2, custom_public_key_pem=self.pub_pem)
+        self.assertEqual(res_key1["status"], "VALID")
+        self.assertTrue(res_key1["valid"])
+        self.assertTrue(res_key1["signers"][0]["matched_custom_key"])
+        self.assertFalse(res_key1["signers"][1]["matched_custom_key"])
+
+        # Uji dengan kunci Pihak 2 (Wardah)
+        res_key2 = verify_generic_file(signed_2, custom_public_key_pem=pub_2_pem)
+        self.assertEqual(res_key2["status"], "VALID")
+        self.assertTrue(res_key2["valid"])
+        self.assertFalse(res_key2["signers"][0]["matched_custom_key"])
+        self.assertTrue(res_key2["signers"][1]["matched_custom_key"])
+
+        # Uji dengan kunci asing (penyerang)
+        _, alien_pub = generate_keypair()
+        res_alien = verify_generic_file(signed_2, custom_public_key_pem=export_public_key_pem(alien_pub))
+        self.assertEqual(res_alien["status"], "KEY_MISMATCH")
+        self.assertFalse(res_alien["valid"])
+
 
 if __name__ == "__main__":
     unittest.main()
