@@ -15,8 +15,10 @@ import json
 import zlib
 import base64
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Tuple, Dict, Any, Optional
+
+WIB = timezone(timedelta(hours=7))
 
 import qrcode
 from PIL import Image
@@ -220,7 +222,7 @@ def _draw_badge(
     c.drawString(text_x, y + 34.0, inst_display)
 
     c.setFillColor(HexColor("#166534"))  # Hijau status valid
-    c.setFont("Helvetica-Bold", 7.0)
+    c.setFont("Helvetica-Bold", 6.7)
     c.drawString(text_x, y + 21.0, f"Terverifikasi: {date_str}")
 
     # 5. Penempelan Gambar QR-Code di sisi kanan badge.
@@ -253,7 +255,7 @@ def _compute_legalization_badge_position(
     margin_x = 45.0
     x = margin_x if col == 0 else (page_width - margin_x - badge_width)
 
-    top_y = page_height - 250.0  # Tepat di bawah kotak ringkasan integritas
+    top_y = page_height - 256.0  # Tepat di bawah kotak ringkasan integritas
     y = max(115.0, top_y - (row * (badge_height + 18.0)))
     return x, y
 
@@ -287,53 +289,61 @@ def create_legalization_page_pdf(
         pass
 
     if is_base_page:
-        # 1. Header / Kop Lembaga
+        # 1. Header / Kop Lembaga (Dinamis dari Identitas Metadata Penandatangan)
+        inst_clean = (institution or "Universitas Siliwangi").strip()
+        header_font_size = 12.0 if len(inst_clean) <= 35 else (10.0 if len(inst_clean) <= 55 else 8.5)
         c.setFillColor(HexColor("#0B3C5D"))
-        c.setFont("Helvetica-Bold", 13.0)
-        c.drawString(45, page_height - 48.0, "UNIVERSITAS SILIWANGI")
+        c.setFont("Helvetica-Bold", header_font_size)
+        c.drawString(45, page_height - 45.0, inst_clean.upper())
 
         c.setFillColor(HexColor("#475569"))
-        c.setFont("Helvetica-Bold", 8.0)
-        c.drawString(45, page_height - 62.0, "FAKULTAS TEKNIK • PUSAT OTENTIKASI & TANDA TANGAN ELEKTRONIK (TTE)")
+        c.setFont("Helvetica-Bold", 7.6)
+        c.drawString(45, page_height - 58.0, "OTORITAS PENERBIT PENGESAHAN DOKUMEN ELEKTRONIK • SISTEM SIGNACERTA")
 
+        # Garis Pembatas Kop Formal (Navy & Slate)
         c.setStrokeColor(HexColor("#0B3C5D"))
         c.setLineWidth(1.6)
-        c.line(45, page_height - 70.0, page_width - 45, page_height - 70.0)
+        c.line(45, page_height - 67.0, page_width - 45, page_height - 67.0)
         c.setStrokeColor(HexColor("#0284C7"))
         c.setLineWidth(0.6)
-        c.line(45, page_height - 73.0, page_width - 45, page_height - 73.0)
+        c.line(45, page_height - 70.0, page_width - 45, page_height - 70.0)
 
         # 2. Kotak Ringkasan Integritas Dokumen Asli
-        box_y = page_height - 146.0
+        box_y = page_height - 150.0
         c.setFillColor(HexColor("#F8FAFC"))
         c.setStrokeColor(HexColor("#CBD5E1"))
         c.setLineWidth(1.0)
-        c.roundRect(45, box_y, page_width - 90, 60, 5, fill=1, stroke=1)
+        c.roundRect(45, box_y, page_width - 90, 68, 5, fill=1, stroke=1)
 
         c.setFillColor(HexColor("#0F172A"))
-        c.setFont("Helvetica-Bold", 9.5)
-        c.drawString(57, box_y + 42.0, "LEMBAR PENGESAHAN TANDA TANGAN DIGITAL ELEKTRONIK")
+        c.setFont("Helvetica-Bold", 9.2)
+        c.drawString(57, box_y + 49.0, "LEMBAR PENGESAHAN TANDA TANGAN DIGITAL ELEKTRONIK")
 
-        c.setFont("Helvetica", 7.6)
+        c.setFont("Helvetica", 7.4)
         c.setFillColor(HexColor("#475569"))
-        c.drawString(57, box_y + 26.0, "Hash Integritas Dokumen Asli (SHA-256):")
+        c.drawString(57, box_y + 35.0, "Disahkan secara resmi melalui SignaCerta Digital Signature Engine (FIPS 186-4 ECDSA P-256)")
 
-        c.setFont("Courier-Bold", 7.0)
+        c.setFont("Helvetica", 7.0)
+        c.setFillColor(HexColor("#475569"))
+        c.drawString(57, box_y + 22.0, "Hash Integritas Dokumen Asli (SHA-256):")
+
+        c.setFont("Courier-Bold", 6.8)
         c.setFillColor(HexColor("#0B3C5D"))
-        c.drawString(57, box_y + 12.0, base_doc_hash.upper())
+        c.drawString(57, box_y + 10.0, base_doc_hash.upper())
 
         # 3. Catatan Hukum Footer
-        c.setStrokeColor(HexColor("#E2E8F0"))
+        c.setStrokeColor(HexColor("#CBD5E1"))
         c.setLineWidth(0.8)
-        c.line(45, 95.0, page_width - 45, 95.0)
+        c.line(45, 96.0, page_width - 45, 96.0)
 
         c.setFont("Helvetica-Bold", 7.0)
-        c.setFillColor(HexColor("#475569"))
-        c.drawString(45, 82.0, "INFORMASI KEABSAHAN HUKUM & VERIFIKASI:")
-        c.setFont("Helvetica", 6.6)
+        c.setFillColor(HexColor("#334155"))
+        c.drawString(45, 83.0, "DASAR HUKUM & KEABSAHAN DOKUMEN ELEKTRONIK:")
+        c.setFont("Helvetica", 6.5)
         c.setFillColor(HexColor("#64748B"))
-        c.drawString(45, 71.0, "• Dokumen elektronik ini sah dan mengikat secara hukum sesuai ketentuan UU ITE No. 11/2008 & PP No. 71/2019.")
-        c.drawString(45, 60.0, "• Keaslian berkas dan validitas tanda tangan dapat diverifikasi mandiri dengan memindai QR-Code resmi pada lencana.")
+        c.drawString(45, 72.0, "• Dokumen elektronik ini telah ditandatangani dan disahkan secara digital melalui SignaCerta Digital Signature Engine.")
+        c.drawString(45, 62.0, "• Memiliki kekuatan hukum dan akibat hukum yang sah sesuai ketentuan Pasal 5 & 11 UU ITE No. 11/2008 serta PP No. 71/2019 tentang PSTE.")
+        c.drawString(45, 52.0, "• Keaslian berkas dan validitas sertifikat tanda tangan dapat diverifikasi mandiri secara publik via pemindaian kode QR resmi.")
 
     # 4. Gambar Lencana Penandatangan pada Slot
     x, y = _compute_legalization_badge_position(page_width, page_height, slot_index, badge_width, badge_height)
@@ -402,7 +412,7 @@ def sign_and_stamp_pdf(
        halaman terakhir berkas asli (mode klasik).
     """
     if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        date_str = datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
 
     # 1. Periksa apakah berkas sudah memiliki tanda tangan sebelumnya (Multiple Signers)
     existing_signatures = []
