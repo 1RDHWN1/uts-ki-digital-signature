@@ -1158,18 +1158,29 @@ elif nav_choice == "2. Penandatanganan Dokumen":
             with ci_2:
                 institution = st.text_input("Institusi / Fakultas / Unit:", value=val_inst, placeholder="Contoh: Universitas Siliwangi", key="inst_in")
                 
-                # Pemilih posisi lencana hanya relevan untuk berkas PDF.
-                # Sistem sudah otomatis menata lencana secara berjenjang
-                # (anti-collision), sehingga pengguna tidak perlu mengatur manual.
+                # Pemilih tata letak stempel visual untuk berkas PDF
                 if is_pdf_file or not pdf_file:
-                    stamp_pos = "bottom-right"
-                    if existing_signers_count == 0:
-                        st.caption("Lencana tanda tangan akan ditempatkan otomatis di sudut kanan bawah halaman terakhir.")
+                    st.markdown("**Tata Letak Stempel QR-Code:**")
+                    placement_options = [
+                        "📄 Lembar Pengesahan Khusus (Rekomendasi — 100% Bebas Tertimpa Teks)",
+                        "📌 Halaman Terakhir Dokumen Asli (Pojok Kanan Bawah)",
+                    ]
+                    placement_sel = st.radio(
+                        "Pilihan Penempatan Stempel:",
+                        options=placement_options,
+                        index=0,
+                        label_visibility="collapsed",
+                        help="Lembar Pengesahan Khusus membuat 1 halaman formal di akhir berkas sehingga teks, tabel, atau diagram asli 100% aman dan tidak tertimpa stempel.",
+                    )
+                    if "Lembar Pengesahan" in placement_sel:
+                        stamp_pos = "new_page"
+                        if existing_signers_count == 0:
+                            st.caption("✨ Dokumen akan dilengkapi 1 halaman Lembar Pengesahan resmi di akhir berkas. Seluruh isi teks/tabel asli tetap 100% bersih tanpa tertimpa.")
+                        else:
+                            st.caption(f"✨ Lencana tanda tangan Anda otomatis ditempatkan pada Slot {existing_signers_count + 1} di Lembar Pengesahan tanpa menambah halaman baru.")
                     else:
-                        st.caption(
-                            f"Lencana Anda akan ditempatkan otomatis pada slot ke-{existing_signers_count + 1} "
-                            f"(bertingkat, tidak menumpuk dengan {existing_signers_count} lencana sebelumnya)."
-                        )
+                        stamp_pos = "bottom-right"
+                        st.caption("Lencana ditempelkan di sudut kanan bawah halaman terakhir berkas asli (cocok jika dokumen memiliki area kosong di bagian bawah).")
                 else:
                     # Berkas gambar: tidak memakai lencana visual
                     stamp_pos = "bottom-right"
