@@ -175,40 +175,19 @@ def _compute_badge_position(
     return x, y
 
 
-def create_signature_badge_pdf(
-    page_width: float,
-    page_height: float,
+def _draw_badge(
+    c: canvas.Canvas,
+    x: float,
+    y: float,
+    badge_width: float,
+    badge_height: float,
     signer_name: str,
     signer_id: str,
     institution: str,
     date_str: str,
     qr_png_bytes: bytes,
-    position: str = "bottom-right",
-    badge_width: float = 232.0,
-    badge_height: float = 90.0,
-    slot_index: int = 0,
-) -> bytes:
-    """Membuat dokumen PDF satu halaman transparan berisi badge tanda tangan digital."""
-    x, y = _compute_badge_position(
-        page_width, page_height, position, badge_width, badge_height, slot_index
-    )
-
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=(page_width, page_height))
-
-    # 0. Sentinel marker sebagai teks mikro di sudut halaman.
-    #    Ditulis ke dalam CONTENT STREAM halaman (bukan metadata), sehingga tetap
-    #    bertahan walaupun dokumen ditulis ulang / dikompres oleh aplikasi lain.
-    #    Ukuran sangat kecil (0.4pt) dan hampir transparan agar tidak mengganggu tampilan.
-    try:
-        c.saveState()
-        c.setFillColor(HexColor("#F8FAFC"))  # nyaris sama dengan warna kertas
-        c.setFont("Helvetica", 0.4)
-        c.drawString(2.0, 2.0, f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}")
-        c.restoreState()
-    except Exception:
-        pass
-
+):
+    """Menggambar elemen visual lencana tanda tangan digital pada koordinat (x, y)."""
     # 1. Kotak Luar Lencana (Background & Border)
     c.setStrokeColor(HexColor("#0B3C5D"))
     c.setLineWidth(1.2)
@@ -245,13 +224,157 @@ def create_signature_badge_pdf(
     c.drawString(text_x, y + 21.0, f"Terverifikasi: {date_str}")
 
     # 5. Penempelan Gambar QR-Code di sisi kanan badge.
-    #    Ukuran & posisi diatur agar TIDAK menutupi header bar di bagian atas, dan
-    #    cukup besar agar QR (versi ~11) tetap mudah dipindai dari layar/kertas.
     qr_size = 64.0
     qr_x = x + badge_width - qr_size - 8.0
     qr_y = y + 6.0
     qr_reader = ImageReader(io.BytesIO(qr_png_bytes))
     c.drawImage(qr_reader, qr_x, qr_y, width=qr_size, height=qr_size)
+
+
+def _compute_legalization_badge_position(
+    page_width: float,
+    page_height: float,
+    slot_index: int,
+    badge_width: float = 240.0,
+    badge_height: float = 90.0,
+) -> Tuple[float, float]:
+    """Menghitung koordinat lencana pada Lembar Pengesahan Khusus (Grid 2 Kolom).
+
+    Grid tersusun simetris dari atas ke bawah:
+    Slot 0: Kiri Atas (Penandatangan 1)
+    Slot 1: Kanan Atas (Penandatangan 2)
+    Slot 2: Kiri Baris 2 (Penandatangan 3)
+    Slot 3: Kanan Baris 2 (Penandatangan 4)
+    ...
+    """
+    col = slot_index % 2
+    row = slot_index // 2
+
+    margin_x = 45.0
+    x = margin_x if col == 0 else (page_width - margin_x - badge_width)
+
+    top_y = page_height - 250.0  # Tepat di bawah kotak ringkasan integritas
+    y = max(115.0, top_y - (row * (badge_height + 18.0)))
+    return x, y
+
+
+def create_legalization_page_pdf(
+    page_width: float,
+    page_height: float,
+    base_doc_hash: str,
+    signer_name: str,
+    signer_id: str,
+    institution: str,
+    date_str: str,
+    qr_png_bytes: bytes,
+    slot_index: int = 0,
+    badge_width: float = 240.0,
+    badge_height: float = 90.0,
+    is_base_page: bool = True,
+) -> bytes:
+    """Membuat halaman Lembar Pengesahan Khusus atau lapisan overlay lencananya."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(page_width, page_height))
+
+    # 0. Sentinel marker sebagai teks mikro 0.4pt
+    try:
+        c.saveState()
+        c.setFillColor(HexColor("#F8FAFC"))
+        c.setFont("Helvetica", 0.4)
+        c.drawString(2.0, 2.0, f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}")
+        c.restoreState()
+    except Exception:
+        pass
+
+    if is_base_page:
+        # 1. Header / Kop Lembaga
+        c.setFillColor(HexColor("#0B3C5D"))
+        c.setFont("Helvetica-Bold", 13.0)
+        c.drawString(45, page_height - 48.0, "UNIVERSITAS SILIWANGI")
+
+        c.setFillColor(HexColor("#475569"))
+        c.setFont("Helvetica-Bold", 8.0)
+        c.drawString(45, page_height - 62.0, "FAKULTAS TEKNIK • PUSAT OTENTIKASI & TANDA TANGAN ELEKTRONIK (TTE)")
+
+        c.setStrokeColor(HexColor("#0B3C5D"))
+        c.setLineWidth(1.6)
+        c.line(45, page_height - 70.0, page_width - 45, page_height - 70.0)
+        c.setStrokeColor(HexColor("#0284C7"))
+        c.setLineWidth(0.6)
+        c.line(45, page_height - 73.0, page_width - 45, page_height - 73.0)
+
+        # 2. Kotak Ringkasan Integritas Dokumen Asli
+        box_y = page_height - 146.0
+        c.setFillColor(HexColor("#F8FAFC"))
+        c.setStrokeColor(HexColor("#CBD5E1"))
+        c.setLineWidth(1.0)
+        c.roundRect(45, box_y, page_width - 90, 60, 5, fill=1, stroke=1)
+
+        c.setFillColor(HexColor("#0F172A"))
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawString(57, box_y + 42.0, "LEMBAR PENGESAHAN TANDA TANGAN DIGITAL ELEKTRONIK")
+
+        c.setFont("Helvetica", 7.6)
+        c.setFillColor(HexColor("#475569"))
+        c.drawString(57, box_y + 26.0, "Hash Integritas Dokumen Asli (SHA-256):")
+
+        c.setFont("Courier-Bold", 7.0)
+        c.setFillColor(HexColor("#0B3C5D"))
+        c.drawString(57, box_y + 12.0, base_doc_hash.upper())
+
+        # 3. Catatan Hukum Footer
+        c.setStrokeColor(HexColor("#E2E8F0"))
+        c.setLineWidth(0.8)
+        c.line(45, 95.0, page_width - 45, 95.0)
+
+        c.setFont("Helvetica-Bold", 7.0)
+        c.setFillColor(HexColor("#475569"))
+        c.drawString(45, 82.0, "INFORMASI KEABSAHAN HUKUM & VERIFIKASI:")
+        c.setFont("Helvetica", 6.6)
+        c.setFillColor(HexColor("#64748B"))
+        c.drawString(45, 71.0, "• Dokumen elektronik ini sah dan mengikat secara hukum sesuai ketentuan UU ITE No. 11/2008 & PP No. 71/2019.")
+        c.drawString(45, 60.0, "• Keaslian berkas dan validitas tanda tangan dapat diverifikasi mandiri dengan memindai QR-Code resmi pada lencana.")
+
+    # 4. Gambar Lencana Penandatangan pada Slot
+    x, y = _compute_legalization_badge_position(page_width, page_height, slot_index, badge_width, badge_height)
+    _draw_badge(c, x, y, badge_width, badge_height, signer_name, signer_id, institution, date_str, qr_png_bytes)
+
+    c.save()
+    return buf.getvalue()
+
+
+def create_signature_badge_pdf(
+    page_width: float,
+    page_height: float,
+    signer_name: str,
+    signer_id: str,
+    institution: str,
+    date_str: str,
+    qr_png_bytes: bytes,
+    position: str = "bottom-right",
+    badge_width: float = 232.0,
+    badge_height: float = 90.0,
+    slot_index: int = 0,
+) -> bytes:
+    """Membuat dokumen PDF satu halaman transparan berisi badge tanda tangan digital."""
+    x, y = _compute_badge_position(
+        page_width, page_height, position, badge_width, badge_height, slot_index
+    )
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(page_width, page_height))
+
+    # 0. Sentinel marker sebagai teks mikro di sudut halaman.
+    try:
+        c.saveState()
+        c.setFillColor(HexColor("#F8FAFC"))  # nyaris sama dengan warna kertas
+        c.setFont("Helvetica", 0.4)
+        c.drawString(2.0, 2.0, f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}")
+        c.restoreState()
+    except Exception:
+        pass
+
+    _draw_badge(c, x, y, badge_width, badge_height, signer_name, signer_id, institution, date_str, qr_png_bytes)
 
     c.save()
     return buf.getvalue()
@@ -265,10 +388,19 @@ def sign_and_stamp_pdf(
     signer_id: str,
     institution: str = "Universitas Siliwangi",
     date_str: Optional[str] = None,
-    position: str = "bottom-right",
+    position: str = "new_page",
     verification_url_base: str = "https://signacerta.udincloud.me",
 ) -> Tuple[bytes, Dict[str, Any]]:
-    """Membubuhkan tanda tangan visual (QR-Code badge) dan menyematkan blok integritas digital."""
+    """Membubuhkan tanda tangan visual (QR-Code badge) dan menyematkan blok integritas digital.
+
+    Mendukung dua mode penempatan visual:
+    1. 'new_page' (Default): Membuat Lembar Pengesahan Khusus di halaman paling belakang,
+       sehingga 100% TIDAK PERNAH menimpa/menutupi teks atau diagram pada dokumen asli.
+       Pada penandatanganan berjenjang (multi-signers), seluruh lencana disusun rapi
+       dalam grid 2 kolom pada lembar pengesahan yang sama tanpa membuat lembar baru lagi.
+    2. 'bottom-right' / 'bottom-left' / 'in_page': Menempelkan lencana langsung pada sudut
+       halaman terakhir berkas asli (mode klasik).
+    """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -276,6 +408,7 @@ def sign_and_stamp_pdf(
     existing_signatures = []
     base_doc_hash = ""
     base_bytes = input_pdf_bytes
+    has_legalization_page = False
 
     if SIG_MARKER_START in input_pdf_bytes and SIG_MARKER_END in input_pdf_bytes:
         parts = input_pdf_bytes.split(SIG_MARKER_START)
@@ -285,6 +418,7 @@ def sign_and_stamp_pdf(
             prev_meta = json.loads(sub.decode("utf-8"))
             if isinstance(prev_meta, dict):
                 base_doc_hash = prev_meta.get("base_doc_hash", "")
+                has_legalization_page = prev_meta.get("has_legalization_page", False)
                 if "signatures" in prev_meta:
                     existing_signatures = prev_meta["signatures"]
                 else:
@@ -304,6 +438,18 @@ def sign_and_stamp_pdf(
     num_pages = len(reader_base.pages)
     if num_pages == 0:
         raise ValueError("Dokumen PDF tidak memiliki halaman.")
+
+    # Deteksi tambahan: jika halaman terakhir memuat teks lembar pengesahan resmi
+    if not has_legalization_page and num_pages > 0:
+        try:
+            last_text = reader_base.pages[-1].extract_text() or ""
+            if "LEMBAR PENGESAHAN TANDA TANGAN DIGITAL" in last_text:
+                has_legalization_page = True
+        except Exception:
+            pass
+
+    # Tentukan mode penempatan
+    use_legalization_page = (position in ("new_page", "legalization_page", "sheet")) or has_legalization_page
 
     last_page = reader_base.pages[-1]
     page_w = float(last_page.mediabox.width)
@@ -340,32 +486,72 @@ def sign_and_stamp_pdf(
 
     qr_bytes = create_qr_code_image(qr_payload)
 
-    # 4. Buat badge overlay dan gabungkan ke halaman terakhir.
-    #    slot_index otomatis = jumlah penandatangan sebelumnya, sehingga lencana
-    #    tersusun berjenjang dan TIDAK saling menumpuk (anti-collision).
+    # 4. Buat stempel visual dan susun halaman dokumen
     slot_index = len(existing_signatures)
-    badge_pdf_bytes = create_signature_badge_pdf(
-        page_width=page_w,
-        page_height=page_h,
-        signer_name=signer_name,
-        signer_id=signer_id,
-        institution=institution,
-        date_str=date_str,
-        qr_png_bytes=qr_bytes,
-        position=position,
-        slot_index=slot_index,
-    )
-    overlay_reader = PdfReader(io.BytesIO(badge_pdf_bytes))
-    last_page.merge_page(overlay_reader.pages[0])
-
-    # 5. Tulis PDF bertanda tangan visual
     writer = PdfWriter()
-    for page in reader_base.pages:
-        writer.add_page(page)
 
-    # 5b. Sentel marker pada metadata PDF: jejak non-kriptografis agar berkas yang
-    #     pernah ditandatangani lalu ditulis ulang (mis. dikompres) masih dapat
-    #     dikenali sebagai "pernah ditandatangani" saat blok integritasnya hilang.
+    if use_legalization_page:
+        if not has_legalization_page:
+            # Penandatangan pertama: dokumen asli tetap 100% utuh tanpa stempel,
+            # lalu tambahkan 1 lembar halaman baru khusus Lembar Pengesahan di akhir.
+            for page in reader_base.pages:
+                writer.add_page(page)
+
+            leg_page_bytes = create_legalization_page_pdf(
+                page_width=page_w,
+                page_height=page_h,
+                base_doc_hash=base_doc_hash,
+                signer_name=signer_name,
+                signer_id=signer_id,
+                institution=institution,
+                date_str=date_str,
+                qr_png_bytes=qr_bytes,
+                slot_index=0,
+                is_base_page=True,
+            )
+            leg_reader = PdfReader(io.BytesIO(leg_page_bytes))
+            writer.add_page(leg_reader.pages[0])
+        else:
+            # Penandatangan berikutnya: dokumen sudah memiliki Lembar Pengesahan di halaman terakhir.
+            # Jangan tambah halaman baru! Cukup tempelkan lencana baru di slot berikutnya.
+            for page in reader_base.pages[:-1]:
+                writer.add_page(page)
+
+            target_leg_page = reader_base.pages[-1]
+            leg_overlay_bytes = create_legalization_page_pdf(
+                page_width=page_w,
+                page_height=page_h,
+                base_doc_hash=base_doc_hash,
+                signer_name=signer_name,
+                signer_id=signer_id,
+                institution=institution,
+                date_str=date_str,
+                qr_png_bytes=qr_bytes,
+                slot_index=slot_index,
+                is_base_page=False,
+            )
+            overlay_reader = PdfReader(io.BytesIO(leg_overlay_bytes))
+            target_leg_page.merge_page(overlay_reader.pages[0])
+            writer.add_page(target_leg_page)
+    else:
+        # Mode klasik: lencana ditempel langsung di halaman terakhir dokumen asli
+        badge_pdf_bytes = create_signature_badge_pdf(
+            page_width=page_w,
+            page_height=page_h,
+            signer_name=signer_name,
+            signer_id=signer_id,
+            institution=institution,
+            date_str=date_str,
+            qr_png_bytes=qr_bytes,
+            position=position,
+            slot_index=slot_index,
+        )
+        overlay_reader = PdfReader(io.BytesIO(badge_pdf_bytes))
+        last_page.merge_page(overlay_reader.pages[0])
+        for page in reader_base.pages:
+            writer.add_page(page)
+
+    # 5b. Sentinel marker pada metadata PDF
     try:
         marker_text = f"SignaCerta-Sig:{signer_name}|{signer_id}|{date_str}"
         writer.add_metadata({
@@ -383,10 +569,7 @@ def sign_and_stamp_pdf(
     # 6. Hitung Hash SHA-256 dari seluruh isi PDF visual akhir
     final_file_hash_hex = hashlib.sha256(stamped_clean_bytes).hexdigest()
 
-    # 7. Tanda tangan ECDSA (sig_b64) sudah dihitung pada langkah 3 agar dapat
-    #    disematkan ke dalam QR-Code; tidak perlu ditandatangani ulang di sini.
-
-    # 8. Susun metadata tanda tangan
+    # 7. Susun metadata tanda tangan
     new_signature_record = {
         "signer": signer_name,
         "id": signer_id,
@@ -406,6 +589,7 @@ def sign_and_stamp_pdf(
         "doc_hash": final_file_hash_hex,
         "total_signers": len(all_signatures),
         "signatures": all_signatures,
+        "has_legalization_page": use_legalization_page,
     }
 
     # 9. Sematkan blok integritas kriptografi ke akhir berkas PDF
