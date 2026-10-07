@@ -125,6 +125,40 @@ class TestQrVerification(unittest.TestCase):
         """Uji 10: Hash dokumen di QR identik dengan hash dokumen asli."""
         self.assertEqual(self.ctx["payload"]["hash"], self.ctx["base_hash"])
 
+    def test_11_pdf_multi_signer_custom_public_key(self):
+        """Uji 11: PDF multi-signer diuji dengan public key salah satu pihak harus VALID."""
+        # Tambah tanda tangan pihak kedua di atas dokumen yang sudah ada
+        priv_2, pub_2 = generate_keypair()
+        pub_2_pem = export_public_key_pem(pub_2)
+        signed_2, _ = sign_and_stamp_pdf(
+            input_pdf_bytes=self.ctx["signed"],
+            private_key=priv_2,
+            public_key_pem=pub_2_pem,
+            signer_name="Wardah Nurwaffiq",
+            signer_id="247006111150",
+            position="bottom-left",
+        )
+
+        # Uji dengan kunci Pihak 1 (milik self.ctx)
+        res_key1 = verify_pdf_document(signed_2, custom_public_key_pem=self.ctx["pem"])
+        self.assertEqual(res_key1["status"], "VALID")
+        self.assertTrue(res_key1["valid"])
+        self.assertTrue(res_key1["signers"][0]["matched_custom_key"])
+        self.assertFalse(res_key1["signers"][1]["matched_custom_key"])
+
+        # Uji dengan kunci Pihak 2 (Wardah)
+        res_key2 = verify_pdf_document(signed_2, custom_public_key_pem=pub_2_pem)
+        self.assertEqual(res_key2["status"], "VALID")
+        self.assertTrue(res_key2["valid"])
+        self.assertFalse(res_key2["signers"][0]["matched_custom_key"])
+        self.assertTrue(res_key2["signers"][1]["matched_custom_key"])
+
+        # Uji dengan kunci penyerang asing
+        _, alien_pub = generate_keypair()
+        res_alien = verify_pdf_document(signed_2, custom_public_key_pem=export_public_key_pem(alien_pub))
+        self.assertEqual(res_alien["status"], "KEY_MISMATCH")
+        self.assertFalse(res_alien["valid"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
