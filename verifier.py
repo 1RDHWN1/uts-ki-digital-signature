@@ -254,30 +254,92 @@ def verify_pdf_document(
             "details": metadata,
         }
 
+    # 2. Muat Kunci Publik Penguji jika diberikan
+    custom_pub_key_obj = None
+    if custom_public_key_pem:
+        try:
+            custom_pub_key_obj = load_public_key_pem(custom_public_key_pem)
+        except Exception:
+            return {
+                "valid": False,
+                "status": "KEY_MISMATCH",
+                "message": "Kunci Publik penguji tidak valid atau formatnya rusak.",
+                "computed_hash": computed_hash,
+                "expected_hash": expected_hash,
+                "details": metadata,
+            }
+
+    # Jika custom key diuji, periksa apakah cocok dengan setidaknya salah satu penandatangan.
+    # Pada dokumen berjenjang (multi-signers), setiap penandatangan memiliki kuncinya sendiri.
+    # Memaksakan satu kunci penguji ke semua pihak secara membabi buta adalah bug logis.
+    if custom_pub_key_obj is not None:
+        custom_key_matched_any = False
+        for sig_record in signatures:
+            sig_b64 = sig_record.get("signature", "")
+            signed_doc_hash_hex = sig_record.get("doc_hash", expected_hash)
+            try:
+                signed_digest = bytes.fromhex(signed_doc_hash_hex)
+            except Exception:
+                signed_digest = hashlib.sha256(clean_bytes).digest()
+            if verify_hash(custom_pub_key_obj, sig_b64, signed_digest):
+                custom_key_matched_any = True
+                break
+
+        if not custom_key_matched_any:
+            verification_results = []
+            for idx, sig_record in enumerate(signatures):
+                verification_results.append({
+                    "signer_index": idx + 1,
+                    "signer_name": sig_record.get("signer", "Tidak Dikenal"),
+                    "signer_id": sig_record.get("id", "-"),
+                    "institution": sig_record.get("institution", "-"),
+                    "date": sig_record.get("date", "-"),
+                    "valid": False,
+                    "matched_custom_key": False,
+                })
+            return {
+                "valid": False,
+                "status": "KEY_MISMATCH",
+                "message": (
+                    f"Verifikasi gagal: Kunci Publik penguji tidak cocok dengan "
+                    f"penandatangan mana pun pada dokumen ini (total {len(signatures)} penandatangan)."
+                ),
+                "computed_hash": computed_hash,
+                "expected_hash": expected_hash,
+                "signers": verification_results,
+                "details": metadata,
+            }
+
     verification_results = []
     all_signatures_valid = True
+    matched_custom_names = []
 
     for idx, sig_record in enumerate(signatures):
         signer_name = sig_record.get("signer", "Tidak Dikenal")
         sig_b64 = sig_record.get("signature", "")
         signed_doc_hash_hex = sig_record.get("doc_hash", expected_hash)
+        recorded_pub_pem = sig_record.get("public_key_pem", "").encode("utf-8")
         
         try:
             signed_digest = bytes.fromhex(signed_doc_hash_hex)
         except Exception:
             signed_digest = hashlib.sha256(clean_bytes).digest()
 
-        # Tentukan Public Key yang akan digunakan
-        if custom_public_key_pem:
-            target_pub_pem = custom_public_key_pem
-        else:
-            target_pub_pem = sig_record.get("public_key_pem", "").encode("utf-8")
+        is_valid = False
+        matched_custom = False
 
-        try:
-            pub_key = load_public_key_pem(target_pub_pem)
-            is_valid = verify_hash(pub_key, sig_b64, signed_digest)
-        except Exception:
-            is_valid = False
+        # Jika kunci penguji cocok untuk penandatangan ini:
+        if custom_pub_key_obj is not None and verify_hash(custom_pub_key_obj, sig_b64, signed_digest):
+            is_valid = True
+            matched_custom = True
+            matched_custom_names.append(signer_name)
+        else:
+            # Gunakan Kunci Publik resmi milik penandatangan tersebut yang tercatat
+            try:
+                pub_key = load_public_key_pem(recorded_pub_pem)
+                is_valid = verify_hash(pub_key, sig_b64, signed_digest)
+            except Exception:
+                is_valid = False
 
         if not is_valid:
             all_signatures_valid = False
@@ -289,6 +351,7 @@ def verify_pdf_document(
             "institution": sig_record.get("institution", "-"),
             "date": sig_record.get("date", "-"),
             "valid": is_valid,
+            "matched_custom_key": matched_custom,
         })
 
     if not all_signatures_valid:
@@ -302,10 +365,14 @@ def verify_pdf_document(
             "details": metadata,
         }
 
+    success_msg = "Dokumen Asli dan Seluruh Tanda Tangan Digital VALID (100% Otentik)."
+    if custom_public_key_pem and matched_custom_names:
+        success_msg += f" Kunci Publik penguji terbukti cocok dan sah milik: {', '.join(matched_custom_names)}."
+
     return {
         "valid": True,
         "status": "VALID",
-        "message": "Dokumen Asli dan Seluruh Tanda Tangan Digital VALID (100% Otentik).",
+        "message": success_msg,
         "computed_hash": computed_hash,
         "expected_hash": expected_hash,
         "signers": verification_results,
