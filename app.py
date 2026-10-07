@@ -1522,7 +1522,8 @@ elif nav_choice == "3. Verifikasi Integritas":
                     
                     st.markdown("**Daftar Penandatangan Sah:**")
                     for s in res.get("signers", []):
-                        st.write(f"• **{s['signer_name']}** ({s['signer_id']}) — *{s['institution']}* — Tanggal: {s['date']}")
+                        custom_badge = " <span style='color: #10B981; font-weight: bold;'>✓ Cocok dengan Kunci Publik Penguji</span>" if s.get("matched_custom_key") else ""
+                        st.markdown(f"• **{s['signer_name']}** ({s['signer_id']}) — *{s['institution']}* — Tanggal: {s['date']}{custom_badge}", unsafe_allow_html=True)
                     
                     st.caption("Digest SHA-256 Terverifikasi:")
                     st.markdown(f'<div class="hash-badge">{res.get("computed_hash")}</div>', unsafe_allow_html=True)
@@ -1560,6 +1561,11 @@ elif nav_choice == "3. Verifikasi Integritas":
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+
+                    if res.get("signers"):
+                        st.markdown("**Daftar Penandatangan Terdaftar pada Berkas:**")
+                        for s in res.get("signers", []):
+                            st.write(f"• **{s['signer_name']}** ({s['signer_id']}) — *{s['institution']}* — ❌ *Kunci publik penguji tidak cocok*")
                 else:
                     # Status UNSIGNED / CORRUPTED_METADATA: tampilkan pesan penjelas.
                     st.warning(res["message"])
